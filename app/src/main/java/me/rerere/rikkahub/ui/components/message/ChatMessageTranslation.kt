@@ -61,9 +61,8 @@ fun LanguageSelectionDialog(
     onDismissRequest: () -> Unit
 ) {
     // 支持的语言列表
-    val languages = remember {
     val displayLocale = LocalConfiguration.current.locales[0]
-
+    val languages = remember {
         listOf(
             Locale.SIMPLIFIED_CHINESE,
             Locale.ENGLISH,
