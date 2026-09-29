@@ -169,9 +169,10 @@ class GoogleToolCombinationTest {
             "buildCompletionRequestBody",
             List::class.java,
             TextGenerationParams::class.java,
+            List::class.java,
         )
         method.isAccessible = true
-        return method.invoke(provider, messages, params) as JsonObject
+        return method.invoke(provider, messages, params, emptyList<String>()) as JsonObject
     }
 
     private fun invokeBuildContents(messages: List<UIMessage>): JsonArray {
