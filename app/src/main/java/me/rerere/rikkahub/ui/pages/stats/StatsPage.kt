@@ -144,8 +144,6 @@ private fun HeatmapCard(conversationsPerDay: Map<LocalDate, Int>, modifier: Modi
 
 @Composable
 private fun ChatHeatmap(conversationsPerDay: Map<LocalDate, Int>) {
-    val today = LocalDate.now()
-private fun ChatHeatmap(conversationsPerDay: Map<LocalDate, Int>) {
     val displayLocale = LocalConfiguration.current.locales[0]
     val today = LocalDate.now()
     val startSunday = today
