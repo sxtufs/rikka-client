@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
+import me.rerere.rikkahub.AppScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -25,7 +25,7 @@ import okhttp3.Request
 
 class GrokOAuthManager(
     private val context: Context,
-    private val scope: CoroutineScope,
+    private val scope: AppScope,
     private val client: OkHttpClient,
     private val repository: GrokAccountRepository,
     private val json: Json,

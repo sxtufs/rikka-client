@@ -110,13 +110,13 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Build unsigned release APK
-        run: ./gradlew assembleRelease --stacktrace
+      - name: Build unsigned arm64 release APK
+        run: ./gradlew assembleRelease --stacktrace -Parm64Only=true
 
       - name: Upload unsigned release APK
         uses: actions/upload-artifact@v4
         with:
           name: rikkahub-release-unsigned-${{ github.sha }}
-          path: app/build/outputs/apk/release/*.apk
+          path: app/build/outputs/apk/release/*arm64-v8a*.apk
           if-no-files-found: error
           retention-days: 14

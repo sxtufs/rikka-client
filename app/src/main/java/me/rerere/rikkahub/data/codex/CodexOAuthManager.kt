@@ -2,7 +2,7 @@ package me.rerere.rikkahub.data.codex
 
 import android.content.Context
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
+import me.rerere.rikkahub.AppScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +21,7 @@ import kotlin.time.Duration.Companion.minutes
 
 class CodexOAuthManager(
     private val context: Context,
-    private val scope: CoroutineScope,
+    private val scope: AppScope,
     private val client: OkHttpClient,
     private val repository: CodexAccountRepository,
 ) {

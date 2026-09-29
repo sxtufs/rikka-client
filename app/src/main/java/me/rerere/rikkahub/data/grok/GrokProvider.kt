@@ -1,6 +1,6 @@
 package me.rerere.rikkahub.data.grok
 
-import kotlinx.coroutines.CoroutineScope
+import me.rerere.rikkahub.AppScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -36,7 +36,7 @@ class GrokProvider(
     private val client: OkHttpClient,
     private val repository: GrokAccountRepository,
     private val json: Json,
-    private val scope: CoroutineScope,
+    private val scope: AppScope,
 ) : Provider<ProviderSetting.Grok> {
     override suspend fun listModels(providerSetting: ProviderSetting.Grok): List<Model> =
         withContext(Dispatchers.IO) {

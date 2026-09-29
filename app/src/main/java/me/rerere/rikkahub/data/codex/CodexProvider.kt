@@ -1,7 +1,7 @@
 package me.rerere.rikkahub.data.codex
 
 import android.os.Build
-import kotlinx.coroutines.CoroutineScope
+import me.rerere.rikkahub.AppScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -40,7 +40,7 @@ class CodexProvider(
     private val client: OkHttpClient,
     private val repository: CodexAccountRepository,
     private val json: Json,
-    private val scope: CoroutineScope,
+    private val scope: AppScope,
 ) : Provider<ProviderSetting.Codex> {
     override suspend fun listModels(providerSetting: ProviderSetting.Codex): List<Model> =
         withContext(Dispatchers.IO) {
