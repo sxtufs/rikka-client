@@ -67,6 +67,7 @@ private fun SillyTavernImporter(
     val filesManager: FilesManager = koinInject()
     val scope = rememberCoroutineScope()
     val toaster = LocalToaster.current
+    val importFailedMessage = stringResource(R.string.assistant_importer_import_failed)
     var isLoading by remember { mutableStateOf(false) }
 
     val jsonPickerLauncher = rememberLauncherForActivityResult(
@@ -86,7 +87,7 @@ private fun SillyTavernImporter(
                         )
                     }.onFailure { exception ->
                         exception.printStackTrace()
-                        toaster.show(exception.message ?: context.getString(R.string.assistant_importer_import_failed))
+                        toaster.show(exception.message ?: importFailedMessage)
                     }
                 } finally {
                     isLoading = false
@@ -112,7 +113,7 @@ private fun SillyTavernImporter(
                         )
                     }.onFailure { exception ->
                         exception.printStackTrace()
-                        toaster.show(exception.message ?: context.getString(R.string.assistant_importer_import_failed))
+                        toaster.show(exception.message ?: importFailedMessage)
                     }
                 } finally {
                     isLoading = false
@@ -284,7 +285,7 @@ private suspend fun importAssistantFromUri(
     } catch (exception: Exception) {
         exception.printStackTrace()
         toaster.show(
-            message = exception.message ?: context.getString(R.string.assistant_importer_import_failed),
+            message = exception.message ?: importFailedMessage,
             type = ToastType.Error
         )
     }
