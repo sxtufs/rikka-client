@@ -34,7 +34,11 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            abiFilters += if (arm64Only) {
+                listOf("arm64-v8a")
+            } else {
+                listOf("arm64-v8a", "x86_64")
+            }
         }
     }
 
