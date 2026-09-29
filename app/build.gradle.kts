@@ -47,12 +47,12 @@ android {
             // AppBundle tasks usually contain "bundle" in their name
             //noinspection WrongGradleMethod
             val isBuildingBundle = gradle.startParameter.taskNames.any { it.lowercase().contains("bundle") }
-            isEnable = arm64Only || !isBuildingBundle
+            // When arm64Only is requested, leave ABI splits disabled and let
+            // ndk.abiFilters produce one arm64-only APK. Android Gradle rejects
+            // matching filters in both `ndk` and `splits`.
+            isEnable = !arm64Only && !isBuildingBundle
             reset()
-            if (arm64Only) {
-                include("arm64-v8a")
-                isUniversalApk = false
-            } else {
+            if (!arm64Only) {
                 include("arm64-v8a", "x86_64")
                 isUniversalApk = true
             }

@@ -117,6 +117,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rikkahub-release-unsigned-${{ github.sha }}
-          path: app/build/outputs/apk/release/*arm64-v8a*.apk
+          # With arm64Only=true, the single APK has the standard app-release name.
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
