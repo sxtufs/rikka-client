@@ -61,7 +61,9 @@ class CodexOAuthManager(
                 val callback = session.awaitCallback(10.minutes)
                     ?: error("OpenAI sign-in timed out")
                 if (callback.state != state) error("OAuth state mismatch")
-                if (!callback.error.isNullOrBlank()) error(callback.errorDescription ?: callback.error)
+                if (!callback.error.isNullOrBlank()) {
+                    error(callback.errorDescription ?: callback.error ?: "OpenAI authorization failed")
+                }
                 val code = callback.code ?: error("Missing authorization code")
                 val token = oauth.exchangeAuthorizationCode(
                     AuthorizationCodeTokenRequest(

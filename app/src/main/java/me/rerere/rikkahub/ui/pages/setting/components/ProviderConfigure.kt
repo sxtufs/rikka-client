@@ -149,6 +149,7 @@ internal fun ProviderSetting.defaultBaseUrlForReset(): String {
             is ProviderSetting.OpenAI -> if (defaultProvider is ProviderSetting.OpenAI) return defaultProvider.baseUrl
             is ProviderSetting.Google -> if (defaultProvider is ProviderSetting.Google) return defaultProvider.baseUrl
             is ProviderSetting.Claude -> if (defaultProvider is ProviderSetting.Claude) return defaultProvider.baseUrl
+            is ProviderSetting.Codex, is ProviderSetting.Grok, is ProviderSetting.GeminiOAuth -> Unit
         }
     }
     return when (this) {
@@ -259,11 +260,11 @@ private fun ProviderConfigureOAuth(
             Button(onClick = manager::startLogin, modifier = Modifier.fillMaxWidth()) {
                 Text("Sign in with OpenAI")
             }
-            when (status) {
+            when (val currentStatus = status) {
                 CodexOAuthStatus.Idle -> Unit
                 CodexOAuthStatus.Waiting -> Text("Waiting for OpenAI authorization…")
                 is CodexOAuthStatus.Success -> Text("OpenAI account connected")
-                is CodexOAuthStatus.Error -> Text("OpenAI sign-in failed: ${status.message}")
+                is CodexOAuthStatus.Error -> Text("OpenAI sign-in failed: ${currentStatus.message}")
             }
         }
         is ProviderSetting.Grok -> {
@@ -272,12 +273,12 @@ private fun ProviderConfigureOAuth(
             Button(onClick = manager::startLogin, modifier = Modifier.fillMaxWidth()) {
                 Text("Sign in with xAI")
             }
-            when (status) {
+            when (val currentStatus = status) {
                 GrokOAuthStatus.Idle -> Unit
                 GrokOAuthStatus.Starting -> Text("Starting xAI sign-in…")
                 is GrokOAuthStatus.AwaitingApproval -> Text("Approve xAI sign-in in your browser")
                 is GrokOAuthStatus.Success -> Text("xAI account connected")
-                is GrokOAuthStatus.Error -> Text("xAI sign-in failed: ${status.message}")
+                is GrokOAuthStatus.Error -> Text("xAI sign-in failed: ${currentStatus.message}")
             }
         }
         is ProviderSetting.GeminiOAuth -> Text(
