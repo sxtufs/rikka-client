@@ -526,6 +526,8 @@ private fun ImageGalleryScreen(
     val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     val toaster = LocalToaster.current
+    val deleteImagesSuccessFormat = stringResource(R.string.imggen_page_delete_images_success)
+    val deleteImagesFailedFormat = stringResource(R.string.imggen_page_delete_images_failed)
     val pullToRefreshState = rememberPullToRefreshState()
     var selectionMode by remember { mutableStateOf(false) }
     var selectedImages by remember { mutableStateOf<Map<Int, GeneratedImage>>(emptyMap()) }
@@ -571,12 +573,14 @@ private fun ImageGalleryScreen(
                             selectedImages = failed.associateBy { it.id }
                             selectionMode = failed.isNotEmpty()
                             toaster.show(
-                                message = if (failed.isEmpty()) context.getString(R.string.imggen_page_delete_images_success, images.size)
-                                else context.getString(
-                                    R.string.imggen_page_delete_images_failed,
-                                    images.size - failed.size,
-                                    failed.size
-                                ),
+                                message = if (failed.isEmpty()) {
+                                    deleteImagesSuccessFormat.format(images.size)
+                                } else {
+                                    deleteImagesFailedFormat.format(
+                                        images.size - failed.size,
+                                        failed.size,
+                                    )
+                                },
                                 type = if (failed.isEmpty()) ToastType.Success else ToastType.Error
                             )
                         } finally {
