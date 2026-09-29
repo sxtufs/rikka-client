@@ -15,6 +15,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,6 +32,11 @@ import androidx.compose.ui.unit.dp
 import com.dokar.sonner.ToastType
 import me.rerere.ai.provider.ClaudePromptCacheTtl
 import me.rerere.ai.provider.ProviderSetting
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import me.rerere.rikkahub.data.codex.CodexOAuthManager
+import me.rerere.rikkahub.data.codex.CodexOAuthStatus
+import me.rerere.rikkahub.data.grok.GrokOAuthManager
+import me.rerere.rikkahub.data.grok.GrokOAuthStatus
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.DEFAULT_PROVIDERS
 import me.rerere.hugeicons.HugeIcons
@@ -44,6 +50,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.reflect.KClass
+import org.koin.compose.koinInject
 
 @Composable
 fun ProviderConfigure(
@@ -75,6 +82,9 @@ fun ProviderConfigure(
             is ProviderSetting.OpenAI -> ProviderConfigureOpenAI(provider, onEdit)
             is ProviderSetting.Google -> ProviderConfigureGoogle(provider, onEdit)
             is ProviderSetting.Claude -> ProviderConfigureClaude(provider, onEdit)
+            is ProviderSetting.Codex -> ProviderConfigureOAuth(provider, onEdit)
+            is ProviderSetting.Grok -> ProviderConfigureOAuth(provider, onEdit)
+            is ProviderSetting.GeminiOAuth -> ProviderConfigureOAuth(provider, onEdit)
         }
     }
 }
@@ -86,6 +96,9 @@ fun ProviderSetting.convertTo(type: KClass<out ProviderSetting>): ProviderSettin
         is ProviderSetting.OpenAI -> this.apiKey
         is ProviderSetting.Google -> this.apiKey
         is ProviderSetting.Claude -> this.apiKey
+        is ProviderSetting.Codex,
+        is ProviderSetting.Grok,
+        is ProviderSetting.GeminiOAuth -> error("OAuth providers cannot be converted to API-key providers")
     }
     val sourceBaseUrl = when (this) {
         is ProviderSetting.OpenAI -> this.baseUrl
@@ -96,6 +109,9 @@ fun ProviderSetting.convertTo(type: KClass<out ProviderSetting>): ProviderSettin
         ProviderSetting.OpenAI::class -> ProviderSetting.OpenAI().baseUrl
         ProviderSetting.Google::class -> ProviderSetting.Google().baseUrl
         ProviderSetting.Claude::class -> ProviderSetting.Claude().baseUrl
+        ProviderSetting.Codex::class,
+        ProviderSetting.Grok::class,
+        ProviderSetting.GeminiOAuth::class -> error("OAuth providers cannot be converted to API-key providers")
         else -> error("Unsupported provider type: $type")
     }
     val convertedBaseUrl = sourceBaseUrl.convertToTargetBaseUrl(targetDefaultBaseUrl)
@@ -119,6 +135,9 @@ fun ProviderSetting.convertTo(type: KClass<out ProviderSetting>): ProviderSettin
             description = this.description, shortDescription = this.shortDescription,
             apiKey = apiKey, baseUrl = convertedBaseUrl
         )
+        ProviderSetting.Codex::class,
+        ProviderSetting.Grok::class,
+        ProviderSetting.GeminiOAuth::class -> error("OAuth providers cannot be converted to API-key providers")
         else -> error("Unsupported provider type: $type")
     }
 }
@@ -136,6 +155,9 @@ internal fun ProviderSetting.defaultBaseUrlForReset(): String {
         is ProviderSetting.OpenAI -> ProviderSetting.OpenAI().baseUrl
         is ProviderSetting.Google -> ProviderSetting.Google().baseUrl
         is ProviderSetting.Claude -> ProviderSetting.Claude().baseUrl
+        is ProviderSetting.Codex,
+        is ProviderSetting.Grok,
+        is ProviderSetting.GeminiOAuth -> ""
     }
 }
 
@@ -145,6 +167,9 @@ internal fun ProviderSetting.resetBaseUrlToDefault(): ProviderSetting {
         is ProviderSetting.OpenAI -> this.copy(baseUrl = defaultBaseUrl)
         is ProviderSetting.Google -> this.copy(baseUrl = defaultBaseUrl)
         is ProviderSetting.Claude -> this.copy(baseUrl = defaultBaseUrl)
+        is ProviderSetting.Codex,
+        is ProviderSetting.Grok,
+        is ProviderSetting.GeminiOAuth -> this
     }
 }
 
@@ -153,6 +178,9 @@ internal fun ProviderSetting.isUsingDefaultBaseUrl(): Boolean {
         is ProviderSetting.OpenAI -> this.baseUrl
         is ProviderSetting.Google -> this.baseUrl
         is ProviderSetting.Claude -> this.baseUrl
+        is ProviderSetting.Codex,
+        is ProviderSetting.Grok,
+        is ProviderSetting.GeminiOAuth -> return true
     }
     return baseUrl == defaultBaseUrlForReset()
 }
@@ -197,6 +225,68 @@ private val OFFICIAL_PROVIDER_HOSTS = setOf(
     GOOGLE_OFFICIAL_HOST,
     CLAUDE_OFFICIAL_HOST
 )
+
+@Composable
+private fun ProviderConfigureOAuth(
+    provider: ProviderSetting,
+    onEdit: (ProviderSetting) -> Unit,
+) {
+    provider.description()
+
+    OutlinedTextField(
+        value = provider.name,
+        onValueChange = { onEdit(provider.copyProvider(name = it)) },
+        label = { Text(stringResource(R.string.setting_provider_page_name)) },
+        modifier = Modifier.fillMaxWidth(),
+    )
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(stringResource(R.string.setting_provider_page_enable))
+        Switch(
+            checked = provider.enabled,
+            onCheckedChange = { onEdit(provider.copyProvider(enabled = it)) },
+        )
+    }
+
+    when (provider) {
+        is ProviderSetting.Codex -> {
+            val manager: CodexOAuthManager = koinInject()
+            val status by manager.status.collectAsStateWithLifecycle()
+            Button(onClick = manager::startLogin, modifier = Modifier.fillMaxWidth()) {
+                Text("Sign in with OpenAI")
+            }
+            when (status) {
+                CodexOAuthStatus.Idle -> Unit
+                CodexOAuthStatus.Waiting -> Text("Waiting for OpenAI authorization…")
+                is CodexOAuthStatus.Success -> Text("OpenAI account connected")
+                is CodexOAuthStatus.Error -> Text("OpenAI sign-in failed: ${status.message}")
+            }
+        }
+        is ProviderSetting.Grok -> {
+            val manager: GrokOAuthManager = koinInject()
+            val status by manager.status.collectAsStateWithLifecycle()
+            Button(onClick = manager::startLogin, modifier = Modifier.fillMaxWidth()) {
+                Text("Sign in with xAI")
+            }
+            when (status) {
+                GrokOAuthStatus.Idle -> Unit
+                GrokOAuthStatus.Starting -> Text("Starting xAI sign-in…")
+                is GrokOAuthStatus.AwaitingApproval -> Text("Approve xAI sign-in in your browser")
+                is GrokOAuthStatus.Success -> Text("xAI account connected")
+                is GrokOAuthStatus.Error -> Text("xAI sign-in failed: ${status.message}")
+            }
+        }
+        is ProviderSetting.GeminiOAuth -> Text(
+            "Gemini OAuth uses Google Code Assist/Antigravity. This may be restricted by Google's terms; sign-in will be added with an explicit warning.",
+            color = MaterialTheme.colorScheme.error,
+        )
+        else -> Unit
+    }
+}
 
 @Composable
 private fun ProviderConfigureOpenAI(

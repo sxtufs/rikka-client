@@ -52,6 +52,9 @@ class ProviderManager(client: OkHttpClient, context: Context) {
             is ProviderSetting.OpenAI -> getProvider("openai")
             is ProviderSetting.Google -> getProvider("google")
             is ProviderSetting.Claude -> getProvider("claude")
+            is ProviderSetting.Codex -> getProvider("codex")
+            is ProviderSetting.Grok -> getProvider("grok")
+            is ProviderSetting.GeminiOAuth -> getProvider("gemini_oauth")
         } as Provider<T>
     }
 }

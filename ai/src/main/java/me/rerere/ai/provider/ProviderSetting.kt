@@ -238,6 +238,141 @@ sealed class ProviderSetting {
         }
     }
 
+    @Serializable
+    @SerialName("codex")
+    data class Codex(
+        override var id: Uuid = Uuid.random(),
+        override var enabled: Boolean = false,
+        override var name: String = "Codex",
+        override var models: List<Model> = emptyList(),
+        override val balanceOption: BalanceOption = BalanceOption(),
+        @Transient override val builtIn: Boolean = true,
+        @Transient override val description: @Composable (() -> Unit) = {},
+        @Transient override val shortDescription: @Composable (() -> Unit) = {},
+    ) : ProviderSetting() {
+        override fun addModel(model: Model): ProviderSetting = copy(models = models + model)
+
+        override fun editModel(model: Model): ProviderSetting =
+            copy(models = models.map { if (it.id == model.id) model.copy() else it })
+
+        override fun delModel(model: Model): ProviderSetting =
+            copy(models = models.filter { it.id != model.id })
+
+        override fun moveMove(from: Int, to: Int): ProviderSetting = copy(
+            models = models.toMutableList().apply { add(to, removeAt(from)) }
+        )
+
+        override fun copyProvider(
+            id: Uuid,
+            enabled: Boolean,
+            name: String,
+            models: List<Model>,
+            balanceOption: BalanceOption,
+            builtIn: Boolean,
+            description: @Composable (() -> Unit),
+            shortDescription: @Composable (() -> Unit),
+        ): ProviderSetting = copy(
+            id = id,
+            enabled = enabled,
+            name = name,
+            models = models,
+            balanceOption = balanceOption,
+            builtIn = builtIn,
+            description = description,
+            shortDescription = shortDescription,
+        )
+    }
+
+    @Serializable
+    @SerialName("grok")
+    data class Grok(
+        override var id: Uuid = Uuid.random(),
+        override var enabled: Boolean = false,
+        override var name: String = "Grok",
+        override var models: List<Model> = emptyList(),
+        override val balanceOption: BalanceOption = BalanceOption(),
+        @Transient override val builtIn: Boolean = true,
+        @Transient override val description: @Composable (() -> Unit) = {},
+        @Transient override val shortDescription: @Composable (() -> Unit) = {},
+    ) : ProviderSetting() {
+        override fun addModel(model: Model): ProviderSetting = copy(models = models + model)
+
+        override fun editModel(model: Model): ProviderSetting =
+            copy(models = models.map { if (it.id == model.id) model.copy() else it })
+
+        override fun delModel(model: Model): ProviderSetting =
+            copy(models = models.filter { it.id != model.id })
+
+        override fun moveMove(from: Int, to: Int): ProviderSetting = copy(
+            models = models.toMutableList().apply { add(to, removeAt(from)) }
+        )
+
+        override fun copyProvider(
+            id: Uuid,
+            enabled: Boolean,
+            name: String,
+            models: List<Model>,
+            balanceOption: BalanceOption,
+            builtIn: Boolean,
+            description: @Composable (() -> Unit),
+            shortDescription: @Composable (() -> Unit),
+        ): ProviderSetting = copy(
+            id = id,
+            enabled = enabled,
+            name = name,
+            models = models,
+            balanceOption = balanceOption,
+            builtIn = builtIn,
+            description = description,
+            shortDescription = shortDescription,
+        )
+    }
+
+    @Serializable
+    @SerialName("gemini_oauth")
+    data class GeminiOAuth(
+        override var id: Uuid = Uuid.random(),
+        override var enabled: Boolean = false,
+        override var name: String = "Gemini OAuth",
+        override var models: List<Model> = emptyList(),
+        override val balanceOption: BalanceOption = BalanceOption(),
+        @Transient override val builtIn: Boolean = true,
+        @Transient override val description: @Composable (() -> Unit) = {},
+        @Transient override val shortDescription: @Composable (() -> Unit) = {},
+    ) : ProviderSetting() {
+        override fun addModel(model: Model): ProviderSetting = copy(models = models + model)
+
+        override fun editModel(model: Model): ProviderSetting =
+            copy(models = models.map { if (it.id == model.id) model.copy() else it })
+
+        override fun delModel(model: Model): ProviderSetting =
+            copy(models = models.filter { it.id != model.id })
+
+        override fun moveMove(from: Int, to: Int): ProviderSetting = copy(
+            models = models.toMutableList().apply { add(to, removeAt(from)) }
+        )
+
+        override fun copyProvider(
+            id: Uuid,
+            enabled: Boolean,
+            name: String,
+            models: List<Model>,
+            balanceOption: BalanceOption,
+            builtIn: Boolean,
+            description: @Composable (() -> Unit),
+            shortDescription: @Composable (() -> Unit),
+        ): ProviderSetting = copy(
+            id = id,
+            enabled = enabled,
+            name = name,
+            models = models,
+            balanceOption = balanceOption,
+            builtIn = builtIn,
+            description = description,
+            shortDescription = shortDescription,
+        )
+    }
+
     companion object {
         val Types by lazy {
             listOf(

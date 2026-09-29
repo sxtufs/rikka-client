@@ -18,6 +18,14 @@ import me.rerere.rikkahub.data.ai.transformers.TemplateTransformer
 import me.rerere.rikkahub.data.api.RikkaHubAPI
 import me.rerere.rikkahub.data.api.SponsorAPI
 import me.rerere.rikkahub.data.datastore.SettingsStore
+import me.rerere.rikkahub.data.codex.CodexAccountRepository
+import me.rerere.rikkahub.data.codex.CodexCredentialStore
+import me.rerere.rikkahub.data.codex.CodexOAuthManager
+import me.rerere.rikkahub.data.codex.CodexProvider
+import me.rerere.rikkahub.data.grok.GrokAccountRepository
+import me.rerere.rikkahub.data.grok.GrokCredentialStore
+import me.rerere.rikkahub.data.grok.GrokOAuthManager
+import me.rerere.rikkahub.data.grok.GrokProvider
 import me.rerere.rikkahub.data.sync.BackupManager
 import me.rerere.rikkahub.data.db.AppDatabaseFactory
 import me.rerere.rikkahub.data.db.AppDatabase
@@ -113,6 +121,47 @@ val dataSourceModule = module {
         TranslationHandler(providerManager = get())
     }
 
+    single {
+        CodexCredentialStore(context = get(), json = get())
+    }
+
+    single {
+        CodexAccountRepository(
+            store = get(),
+            client = get(),
+            json = get(),
+        )
+    }
+
+    single {
+        CodexOAuthManager(
+            context = get(),
+            scope = get(),
+            client = get(),
+            repository = get(),
+        )
+    }
+
+    single { GrokCredentialStore(context = get(), json = get()) }
+
+    single {
+        GrokAccountRepository(
+            store = get(),
+            client = get(),
+            json = get(),
+        )
+    }
+
+    single {
+        GrokOAuthManager(
+            context = get(),
+            scope = get(),
+            client = get(),
+            repository = get(),
+            json = get(),
+        )
+    }
+
     single<OkHttpClient> {
         val settingsStore: SettingsStore = get()
         val acceptLang = AcceptLanguageBuilder.fromAndroid(get())
@@ -191,8 +240,27 @@ val dataSourceModule = module {
         SponsorAPI.create(get())
     }
 
-    single {
-        ProviderManager(client = get(), context = get())
+    single<ProviderManager> {
+        ProviderManager(client = get(), context = get()).also { manager ->
+            manager.registerProvider(
+                "codex",
+                CodexProvider(
+                    client = get(),
+                    repository = get(),
+                    json = get(),
+                    scope = get(),
+                )
+            )
+            manager.registerProvider(
+                "grok",
+                GrokProvider(
+                    client = get(),
+                    repository = get(),
+                    json = get(),
+                    scope = get(),
+                )
+            )
+        }
     }
 
     single { BackupManager(context = get(), database = get(), settingsStore = get(), json = get()) }

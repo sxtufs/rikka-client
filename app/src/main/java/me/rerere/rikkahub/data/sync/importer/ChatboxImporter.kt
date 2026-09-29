@@ -671,12 +671,18 @@ object ChatboxImporter {
         is ProviderSetting.OpenAI -> "openai|${provider.baseUrl.trimEnd('/')}|${provider.apiKey}"
         is ProviderSetting.Google -> "google|${provider.baseUrl.trimEnd('/')}|${provider.apiKey}"
         is ProviderSetting.Claude -> "claude|${provider.baseUrl.trimEnd('/')}|${provider.apiKey}"
+        is ProviderSetting.Codex -> "codex|${provider.id}"
+        is ProviderSetting.Grok -> "grok|${provider.id}"
+        is ProviderSetting.GeminiOAuth -> "gemini_oauth|${provider.id}"
     }
 
     private fun ProviderSetting.providerTypeName(): String = when (this) {
         is ProviderSetting.OpenAI -> "openai"
         is ProviderSetting.Google -> "gemini"
         is ProviderSetting.Claude -> "claude"
+        is ProviderSetting.Codex -> "codex"
+        is ProviderSetting.Grok -> "grok"
+        is ProviderSetting.GeminiOAuth -> "gemini_oauth"
     }
 
     private fun String.toMessageRole(): MessageRole? = when (this) {

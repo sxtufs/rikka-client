@@ -75,7 +75,17 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // Use the configured signing key when release secrets are available.
+            // Otherwise keep the release artifact unsigned so CI can still build and upload it.
+            val releaseSigning = signingConfigs.getByName("release")
+            if (
+                releaseSigning.storeFile != null &&
+                releaseSigning.storePassword != null &&
+                releaseSigning.keyAlias != null &&
+                releaseSigning.keyPassword != null
+            ) {
+                signingConfig = releaseSigning
+            }
             optimization {
                 enable = true
             }
