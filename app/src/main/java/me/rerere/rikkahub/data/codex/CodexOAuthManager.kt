@@ -3,6 +3,7 @@ package me.rerere.rikkahub.data.codex
 import android.content.Context
 import kotlinx.coroutines.CancellationException
 import me.rerere.rikkahub.AppScope
+import me.rerere.rikkahub.R
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow

@@ -54,8 +54,9 @@ private val RETRY_DELAY_VALUE_PATTERN = Regex("""^([0-9.]+)(ms|s)$""")
  */
 internal fun classifyGeminiError(statusCode: Int?, body: String?, json: Json): GeminiErrorClassification {
     val error = runCatching {
-        body?.let { json.parseToJsonElement(it).jsonObject["error"]?.let { e ->
-            if (e is JsonObject) e else null
+        body?.let { rawBody ->
+            (json.parseToJsonElement(rawBody) as? JsonObject)
+                ?.get("error") as? JsonObject
         }
     }.getOrNull()
     val effectiveStatus = statusCode ?: error?.get("code")?.jsonPrimitive?.intOrNull
