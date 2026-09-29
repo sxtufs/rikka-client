@@ -67,9 +67,11 @@ class GrokAccountRepository internal constructor(
         repeat(state.accounts.size) {
             val index = selectGrokAccountIndex(state.accounts, state.nextAccountIndex)
                 ?: error("No available Grok account")
-            val account = state.accounts[index]
+            val candidate = state.accounts[index]
+            if (!candidate.isAvailable()) return@repeat
             updateState(state.copy(nextAccountIndex = (index + 1) % state.accounts.size))
-            runCatching { return ensureFreshLocked(account) }
+            val fresh = runCatching { ensureFreshLocked(candidate) }.getOrNull() ?: return@repeat
+            return fresh
         }
         error("No available Grok account")
     }
@@ -89,7 +91,9 @@ class GrokAccountRepository internal constructor(
     suspend fun refreshAccount(accountId: String): GrokAccount = mutex.withLock {
         val account = state.accounts.firstOrNull { it.id == accountId }
             ?: error("Grok account not found")
-        ensureFreshLocked(account, force = true)
+        val fresh = ensureFreshLocked(account, force = true)
+        // Usage/plan fetch is best-effort: never fail a token refresh just because billing is down.
+        runCatching { fetchUsageLocked(fresh) }.getOrDefault(fresh)
     }
 
     suspend fun refreshAll() { accounts.value.forEach { runCatching { refreshAccount(it.id) } } }
@@ -122,6 +126,47 @@ class GrokAccountRepository internal constructor(
         return updated
     }
 
+    private suspend fun fetchUsageLocked(account: GrokAccount): GrokAccount {
+        val credits = withContext(Dispatchers.IO) {
+            client.newCall(
+                Request.Builder().url(CREDITS_URL).grokBillingHeaders(account).get().build()
+            ).await()
+        }
+        if (!credits.isSuccessful) {
+            if (credits.code == 401) {
+                replaceAccount(account.id) { it.copy(tokenStatus = GrokTokenStatus.INVALID) }
+            }
+            error("Failed to fetch Grok usage: ${credits.code}")
+        }
+        val snapshot = parseGrokCreditsUsage(
+            json.parseToJsonElement(credits.body.string()).jsonObject
+        )
+        // Plan name is best-effort — never fail a usage refresh just because /settings is down.
+        val planName = runCatching {
+            val settings = withContext(Dispatchers.IO) {
+                client.newCall(
+                    Request.Builder().url(SETTINGS_URL).grokBillingHeaders(account).get().build()
+                ).await()
+            }
+            if (settings.isSuccessful) {
+                parseGrokPlanName(json.parseToJsonElement(settings.body.string()).jsonObject)
+            } else {
+                null
+            }
+        }.getOrNull()
+        val updated = account.copy(
+            tokenStatus = GrokTokenStatus.AVAILABLE,
+            usage = snapshot.copy(planName = planName ?: account.usage?.planName),
+        )
+        replaceAccount(account.id) { updated }
+        return updated
+    }
+
+    private fun Request.Builder.grokBillingHeaders(account: GrokAccount): Request.Builder =
+        addHeader("Authorization", "Bearer ${account.accessToken}")
+            .addHeader("X-XAI-Token-Auth", "xai-grok-cli")
+            .addHeader("Accept", "application/json")
+
     private fun selectGrokAccountIndex(accounts: List<GrokAccount>, startIndex: Int): Int? {
         if (accounts.isEmpty()) return null
         repeat(accounts.size) { offset ->
@@ -139,5 +184,13 @@ class GrokAccountRepository internal constructor(
         state = newState
         store.write(newState)
         _accounts.value = newState.accounts
+    }
+
+    companion object {
+        private const val REFRESH_MARGIN_MS = 30_000L
+        // Grok subscription usage lives on the CLI billing proxy (the same surface the Grok CLI
+        // uses), not on api.x.ai. The credits endpoint returns the shared weekly pool.
+        private const val CREDITS_URL = "https://cli-chat-proxy.grok.com/v1/billing?format=credits"
+        private const val SETTINGS_URL = "https://cli-chat-proxy.grok.com/v1/settings"
     }
 }

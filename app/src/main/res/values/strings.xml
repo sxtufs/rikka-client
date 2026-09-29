@@ -8,7 +8,10 @@
   <string name="about_page_website">Website</string>
   <string name="add">Add</string>
   <string name="app_name">RikkaHub</string>
+  <string name="asr_button_content_description">Speech Recognition</string>  <string name="app_name">RikkaHub</string>
   <string name="asr_button_content_description">Speech Recognition</string>
+  <string name="codex_oauth_ports_unavailable">Unable to start the Codex OAuth callback server. No ports are available.</string>
+  <string name="gemini_oauth_ports_unavailable">Unable to start the Gemini OAuth callback server. Port 51121 is in use.</string>
   <string name="asr_button_stop">Stop</string>
   <string name="assistant_detail_basic_desc">Configure name, avatar, model, and parameters</string>
   <string name="assistant_detail_extensions_desc">Manage quick messages, prompt injections, lorebooks and skills</string>

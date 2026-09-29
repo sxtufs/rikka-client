@@ -81,6 +81,24 @@ import kotlin.uuid.Uuid
 
 private const val TAG = "GoogleProvider"
 
+/**
+ * Every category the generative-language API accepts on `safetySettings`.
+ */
+val GOOGLE_SAFETY_CATEGORIES = listOf(
+    "HARM_CATEGORY_HARASSMENT",
+    "HARM_CATEGORY_HATE_SPEECH",
+    "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+    "HARM_CATEGORY_DANGEROUS_CONTENT",
+    "HARM_CATEGORY_CIVIC_INTEGRITY",
+)
+
+/**
+ * What Cloud Code Assist accepts, which is the same list minus civic integrity: sending that one
+ * fails the whole request with a 400 naming the offending element, even though the error text
+ * lists the category as allowed.
+ */
+val CODE_ASSIST_SAFETY_CATEGORIES = GOOGLE_SAFETY_CATEGORIES - "HARM_CATEGORY_CIVIC_INTEGRITY"
+
 class GoogleProvider(private val client: OkHttpClient, context: Context? = null) : Provider<ProviderSetting.Google> {
     private val keyRoulette = if (context != null) KeyRoulette.lru(context) else KeyRoulette.default()
     private val serviceAccountTokenProvider by lazy {
@@ -322,9 +340,16 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
         // trySend 在缓冲满时会静默丢弃 delta，导致回复中间缺字 (#1295)，因此缓冲必须无界
     }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.IO)
 
-    private fun buildCompletionRequestBody(
+    /**
+     * Builds the Gemini `generateContent`/`streamGenerateContent` request body. Exposed so that
+     * alternate transports (e.g. the Cloud Code Assist OAuth provider, which wraps the same body
+     * under a `request` key) can reuse one implementation of the Gemini wire format rather than
+     * diverging copies.
+     */
+    fun buildCompletionRequestBody(
         messages: List<UIMessage>,
-        params: TextGenerationParams
+        params: TextGenerationParams,
+        safetyCategories: List<String> = GOOGLE_SAFETY_CATEGORIES,
     ): JsonObject = buildJsonObject {
         // System message if available
         val systemMessage = messages.firstOrNull { it.role == MessageRole.SYSTEM }
@@ -455,26 +480,12 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
 
         // Safety Settings
         putJsonArray("safetySettings") {
-            add(buildJsonObject {
-                put("category", "HARM_CATEGORY_HARASSMENT")
-                put("threshold", "OFF")
-            })
-            add(buildJsonObject {
-                put("category", "HARM_CATEGORY_HATE_SPEECH")
-                put("threshold", "OFF")
-            })
-            add(buildJsonObject {
-                put("category", "HARM_CATEGORY_SEXUALLY_EXPLICIT")
-                put("threshold", "OFF")
-            })
-            add(buildJsonObject {
-                put("category", "HARM_CATEGORY_DANGEROUS_CONTENT")
-                put("threshold", "OFF")
-            })
-            add(buildJsonObject {
-                put("category", "HARM_CATEGORY_CIVIC_INTEGRITY")
-                put("threshold", "OFF")
-            })
+            safetyCategories.forEach { category ->
+                add(buildJsonObject {
+                    put("category", category)
+                    put("threshold", "OFF")
+                })
+            }
         }
     }.mergeCustomBody(params.customBody)
 
@@ -496,7 +507,12 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
         }
     }
 
-    private fun parseMessage(message: JsonObject): UIMessage {
+    /**
+     * Parses a single Gemini `content` object into a [UIMessage]. Exposed so that non-streaming
+     * Code Assist responses (which nest the same candidate under `response`) can reuse the same
+     * part decoding as the API-key transport.
+     */
+    fun parseMessage(message: JsonObject): UIMessage {
         val role = googleRoleToCommonRole(
             message["role"]?.jsonPrimitive?.contentOrNull ?: "model"
         )

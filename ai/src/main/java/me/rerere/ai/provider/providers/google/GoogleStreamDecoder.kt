@@ -22,6 +22,7 @@ import me.rerere.ai.ui.UIMessageAnnotation
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.ai.ui.toMetadata
 import me.rerere.ai.util.json
+import me.rerere.common.http.jsonObjectOrNull
 import me.rerere.common.http.jsonPrimitiveOrNull
 import kotlin.time.Clock
 
@@ -265,4 +266,39 @@ internal class GoogleStreamDecoder(
         this["thoughtSignature"]?.jsonPrimitive?.contentOrNull?.let {
             GoogleThoughtMetadata(thoughtSignature = it).toMetadata()
         }
+}
+
+/**
+ * Decodes a Cloud Code Assist `:streamGenerateContent` (alt=sse) response stream.
+ *
+ * Code Assist nests the ordinary Gemini payload one level down: each SSE event's `data` is
+ * an object whose `response` member is the generateContent-shaped Gemini response, or whose
+ * `error` member carries a failure delivered inside a 200 body. A chunk that carries only
+ * bookkeeping has no `response`, so it yields no stream chunks. This decoder unwraps that
+ * envelope and delegates the Gemini candidate/usage parsing to [GoogleStreamDecoder], so the
+ * Code Assist OAuth transport and the API-key transport share one source of truth instead of
+ * drifting apart.
+ */
+class CodeAssistStreamDecoder(
+    private val responseId: String,
+    private val model: String,
+) : StreamChunkDecoder {
+    private val delegate = GoogleStreamDecoder(responseId, model)
+
+    override fun accept(event: SseEvent): DecodeResult {
+        val payload = runCatching { json.parseToJsonElement(event.data) }.getOrNull()
+            ?.jsonObject ?: return DecodeResult()
+
+        payload["error"]?.jsonObjectOrNull?.let { errorObj ->
+            val message = errorObj["message"]?.jsonPrimitiveOrNull?.contentOrNull ?: "unknown"
+            error("Cloud Code Assist error: $message")
+        }
+
+        val inner = payload["response"]?.jsonObjectOrNull
+            ?: return DecodeResult()
+
+        return delegate.accept(SseEvent(data = json.encodeToString(inner)))
+    }
+
+    override fun onClosed(): List<StreamChunk> = delegate.onClosed()
 }

@@ -35,6 +35,8 @@ import me.rerere.ai.provider.ProviderSetting
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.rikkahub.data.codex.CodexOAuthManager
 import me.rerere.rikkahub.data.codex.CodexOAuthStatus
+import me.rerere.rikkahub.data.gemini.GeminiOAuthManager
+import me.rerere.rikkahub.data.gemini.GeminiOAuthStatus
 import me.rerere.rikkahub.data.grok.GrokOAuthManager
 import me.rerere.rikkahub.data.grok.GrokOAuthStatus
 import me.rerere.rikkahub.R
@@ -281,10 +283,27 @@ private fun ProviderConfigureOAuth(
                 is GrokOAuthStatus.Error -> Text("xAI sign-in failed: ${currentStatus.message}")
             }
         }
-        is ProviderSetting.GeminiOAuth -> Text(
-            "Gemini OAuth uses Google Code Assist/Antigravity. This may be restricted by Google's terms; sign-in will be added with an explicit warning.",
-            color = MaterialTheme.colorScheme.error,
-        )
+        is ProviderSetting.GeminiOAuth -> {
+            Text(
+                "Gemini OAuth signs in with a Google account and talks to Google's Cloud Code " +
+                    "Assist (the Antigravity backend). This is not the official Gemini API; " +
+                    "Google may restrict or revoke access, so keep a standard API-key provider " +
+                    "configured as a fallback.",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.labelSmall,
+            )
+            val manager: GeminiOAuthManager = koinInject()
+            val status by manager.status.collectAsStateWithLifecycle()
+            Button(onClick = manager::startLogin, modifier = Modifier.fillMaxWidth()) {
+                Text("Sign in with Google")
+            }
+            when (val currentStatus = status) {
+                GeminiOAuthStatus.Idle -> Unit
+                GeminiOAuthStatus.Waiting -> Text("Waiting for Google authorization…")
+                is GeminiOAuthStatus.Success -> Text("Google account connected")
+                is GeminiOAuthStatus.Error -> Text("Google sign-in failed: ${currentStatus.message}")
+            }
+        }
         else -> Unit
     }
 }

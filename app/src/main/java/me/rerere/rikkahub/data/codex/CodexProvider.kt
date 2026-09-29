@@ -33,8 +33,10 @@ import me.rerere.ai.ui.ImageGenerationItem
 import me.rerere.ai.ui.StreamChunk
 import me.rerere.ai.ui.UIMessage
 import me.rerere.common.http.await
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.ResponseBody.Companion.asResponseBody
 
 class CodexProvider(
     private val client: OkHttpClient,
@@ -175,7 +177,20 @@ class CodexProvider(
                 if (response.code == 401) {
                     scope.launch { repository.markInvalid(account.id) }
                 }
-                response
+                if (response.isSuccessful && response.header("Content-Type") == null) {
+                    val body = response.body
+                    response.newBuilder()
+                        .header("Content-Type", "text/event-stream")
+                        .body(
+                            body.source().asResponseBody(
+                                contentType = "text/event-stream".toMediaType(),
+                                contentLength = body.contentLength(),
+                            )
+                        )
+                        .build()
+                } else {
+                    response
+                }
             }
             .build()
         return ResponseAPI(accountAwareClient)
@@ -191,7 +206,8 @@ class CodexProvider(
 }
 
 internal fun codexReasoningEffort(level: ReasoningLevel): String? = when (level) {
-    ReasoningLevel.AUTO, ReasoningLevel.OFF -> null
+    ReasoningLevel.AUTO -> null
+    ReasoningLevel.OFF -> "none"
     ReasoningLevel.LOW -> "low"
     ReasoningLevel.MEDIUM -> "medium"
     ReasoningLevel.HIGH -> "high"

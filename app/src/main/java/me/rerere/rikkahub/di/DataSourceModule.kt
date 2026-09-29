@@ -3,7 +3,6 @@ package me.rerere.rikkahub.di
 import android.content.Context
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.http.HttpHeaders
 import io.pebbletemplates.pebble.PebbleEngine
 import kotlinx.serialization.json.Json
 import me.rerere.ai.provider.ProviderManager
@@ -26,6 +25,10 @@ import me.rerere.rikkahub.data.grok.GrokAccountRepository
 import me.rerere.rikkahub.data.grok.GrokCredentialStore
 import me.rerere.rikkahub.data.grok.GrokOAuthManager
 import me.rerere.rikkahub.data.grok.GrokProvider
+import me.rerere.rikkahub.data.gemini.GeminiAccountRepository
+import me.rerere.rikkahub.data.gemini.GeminiCredentialStore
+import me.rerere.rikkahub.data.gemini.GeminiOAuthManager
+import me.rerere.rikkahub.data.gemini.GeminiProvider
 import me.rerere.rikkahub.data.sync.BackupManager
 import me.rerere.rikkahub.data.db.AppDatabaseFactory
 import me.rerere.rikkahub.data.db.AppDatabase
@@ -162,6 +165,27 @@ val dataSourceModule = module {
         )
     }
 
+    single {
+        GeminiCredentialStore(context = get(), json = get())
+    }
+
+    single {
+        GeminiAccountRepository(
+            store = get(),
+            client = get(),
+            json = get(),
+        )
+    }
+
+    single {
+        GeminiOAuthManager(
+            context = get(),
+            scope = get(),
+            client = get(),
+            repository = get(),
+        )
+    }
+
     single<OkHttpClient> {
         val settingsStore: SettingsStore = get()
         val acceptLang = AcceptLanguageBuilder.fromAndroid(get())
@@ -198,13 +222,13 @@ val dataSourceModule = module {
 
                 val originalRequest = chain.request()
                 val requestBuilder = originalRequest.newBuilder()
-                    .addHeader(HttpHeaders.AcceptLanguage, acceptLang)
+                    .addHeader(io.ktor.http.HttpHeaders.AcceptLanguage, acceptLang)
 
-                if (originalRequest.header(HttpHeaders.UserAgent) == null) {
+                if (originalRequest.header(io.ktor.http.HttpHeaders.UserAgent) == null) {
                     val userAgent = settingsStore.settingsFlow.value.networkSetting.userAgent
                         .trim()
                         .ifEmpty { "RikkaHub-Android/${BuildConfig.VERSION_NAME}" }
-                    requestBuilder.addHeader(HttpHeaders.UserAgent, userAgent)
+                    requestBuilder.addHeader(io.ktor.http.HttpHeaders.UserAgent, userAgent)
                 }
 
                 chain.proceed(requestBuilder.build())
@@ -254,6 +278,15 @@ val dataSourceModule = module {
             manager.registerProvider(
                 "grok",
                 GrokProvider(
+                    client = get(),
+                    repository = get(),
+                    json = get(),
+                    scope = get(),
+                )
+            )
+            manager.registerProvider(
+                "gemini_oauth",
+                GeminiProvider(
                     client = get(),
                     repository = get(),
                     json = get(),

@@ -9,9 +9,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import me.rerere.oauth.CustomTabsOAuthAuthorizationLauncher
+import me.rerere.oauth.OAuthAuthorizationLauncher
 import me.rerere.oauth.OAuthHttpClient
 import me.rerere.oauth.OAuthHttpClient.AuthorizationCodeTokenRequest
 import me.rerere.oauth.OAuthHttpClient.AuthorizationRequest
@@ -24,11 +26,11 @@ class CodexOAuthManager(
     private val scope: AppScope,
     private val client: OkHttpClient,
     private val repository: CodexAccountRepository,
+    private val authorizationLauncher: OAuthAuthorizationLauncher = CustomTabsOAuthAuthorizationLauncher,
 ) {
     private val _status = MutableStateFlow<CodexOAuthStatus>(CodexOAuthStatus.Idle)
     val status: StateFlow<CodexOAuthStatus> = _status.asStateFlow()
     private var loginJob: Job? = null
-    private var callbackServer: OAuthLoopbackCallbackServer? = null
 
     fun startLogin() {
         loginJob?.cancel()
@@ -36,11 +38,11 @@ class CodexOAuthManager(
             val state = OAuthHttpClient(client).generateState()
             val oauth = OAuthHttpClient(client)
             val pkce = oauth.generatePkce()
-            val server = OAuthLoopbackCallbackServer(port = 0, callbackPath = "/auth/callback")
-            callbackServer = server
+            var callbackServer: OAuthLoopbackCallbackServer? = null
             var session: me.rerere.oauth.OAuthLoopbackCallbackSession? = null
             try {
-                session = server.openSession(state)
+                callbackServer = OAuthLoopbackCallbackServer(port = 0, callbackPath = "/auth/callback")
+                session = callbackServer.openSession(state)
                 val url = oauth.buildAuthorizationUrl(
                     AuthorizationRequest(
                         authorizationEndpoint = AUTHORIZE_URL,
@@ -57,7 +59,7 @@ class CodexOAuthManager(
                     )
                 )
                 _status.value = CodexOAuthStatus.Waiting
-                CustomTabsOAuthAuthorizationLauncher.launch(context, url)
+                authorizationLauncher.launch(context, url)
                 val callback = session.awaitCallback(10.minutes)
                     ?: error("OpenAI sign-in timed out")
                 if (callback.state != state) error("OAuth state mismatch")
@@ -86,7 +88,13 @@ class CodexOAuthManager(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Throwable) {
-                _status.value = CodexOAuthStatus.Error(error.message ?: "Codex sign-in failed")
+                _status.value = CodexOAuthStatus.Error(
+                    if (error.message == CALLBACK_PORTS_UNAVAILABLE) {
+                        context.getString(R.string.codex_oauth_ports_unavailable)
+                    } else {
+                        error.message ?: "Codex sign-in failed"
+                    }
+                )
             } finally {
                 session?.close()
                 callbackServer = null
@@ -111,6 +119,8 @@ class CodexOAuthManager(
         const val DEFAULT_SCOPES = "openid profile email offline_access"
         const val REFRESH_SCOPES = DEFAULT_SCOPES
     }
+
+    private val CALLBACK_PORTS_UNAVAILABLE = "OAuth callback ports are unavailable"
 }
 
 sealed interface CodexOAuthStatus {
