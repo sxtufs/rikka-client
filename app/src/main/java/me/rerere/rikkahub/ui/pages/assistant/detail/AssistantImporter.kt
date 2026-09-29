@@ -285,7 +285,7 @@ private suspend fun importAssistantFromUri(
     } catch (exception: Exception) {
         exception.printStackTrace()
         toaster.show(
-            message = exception.message ?: importFailedMessage,
+            message = exception.message ?: context.getString(R.string.assistant_importer_import_failed),
             type = ToastType.Error
         )
     }
