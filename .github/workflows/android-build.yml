@@ -37,7 +37,9 @@ jobs:
       - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platform-tools" "platforms;android-37" "build-tools;37.0.0"
+          # API 37 platform packages use minor-versioned IDs.
+          # The app requests compileSdk 37.2 in app/build.gradle.kts.
+          sdkmanager "platform-tools" "platforms;android-37.2" "build-tools;37.0.0"
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
