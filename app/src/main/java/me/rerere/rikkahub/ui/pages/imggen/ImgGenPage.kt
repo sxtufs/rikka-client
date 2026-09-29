@@ -528,6 +528,8 @@ private fun ImageGalleryScreen(
     val toaster = LocalToaster.current
     val deleteImagesSuccessFormat = stringResource(R.string.imggen_page_delete_images_success)
     val deleteImagesFailedFormat = stringResource(R.string.imggen_page_delete_images_failed)
+    val imageSavedSuccessMessage = stringResource(R.string.imggen_page_image_saved_success)
+    val saveFailedFormat = stringResource(R.string.imggen_page_save_failed)
     val pullToRefreshState = rememberPullToRefreshState()
     var selectionMode by remember { mutableStateOf(false) }
     var selectedImages by remember { mutableStateOf<Map<Int, GeneratedImage>>(emptyMap()) }
@@ -742,15 +744,12 @@ private fun ImageGalleryScreen(
                                                         try {
                                                             filesManager.saveMessageImage(context, "file://${it.filePath}")
                                                             toaster.show(
-                                                                message = context.getString(R.string.imggen_page_image_saved_success),
+                                                                message = imageSavedSuccessMessage,
                                                                 type = ToastType.Success
                                                             )
                                                         } catch (e: Exception) {
                                                             toaster.show(
-                                                                message = context.getString(
-                                                                    R.string.imggen_page_save_failed,
-                                                                    e.message
-                                                                ),
+                                                                message = saveFailedFormat.format(e.message.orEmpty()),
                                                                 type = ToastType.Error
                                                             )
                                                         }
