@@ -67,14 +67,24 @@ jobs:
               "project_id": "rikkahub-ci",
               "storage_bucket": "rikkahub-ci.appspot.com"
             },
-            "client": [{
-              "client_info": {
-                "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
-                "android_client_info": {"package_name": "me.rerere.rikkahub"}
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+                  "android_client_info": {"package_name": "me.rerere.rikkahub"}
+                },
+                "api_key": [{"current_key": "CI_BUILD_ONLY"}],
+                "services": {}
               },
-              "api_key": [{"current_key": "CI_BUILD_ONLY"}],
-              "services": {}
-            }],
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000001",
+                  "android_client_info": {"package_name": "me.rerere.rikkahub.debug"}
+                },
+                "api_key": [{"current_key": "CI_BUILD_ONLY"}],
+                "services": {}
+              }
+            ],
             "configuration_version": "1"
           }
           JSON
