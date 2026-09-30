@@ -36,6 +36,3 @@ class DefaultProvidersTest {
         assertTrue(oauthProviders.all { !it.enabled && it.builtIn && it.models.isEmpty() })
     }
 }
-        assertEquals("balance", provider.balanceOption.resultPath)
-    }
-}

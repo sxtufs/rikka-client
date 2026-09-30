@@ -52,6 +52,3 @@ class GrokJsonTest {
         org.junit.Assert.assertFalse(first.contains("refresh-token"))
     }
 }
-        assertEquals(12.0, usage.onDemandCap, 0.0)
-    }
-}
