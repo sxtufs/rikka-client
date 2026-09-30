@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.suspendCancellableCoroutine
 import me.rerere.common.http.await
 import me.rerere.rikkahub.R
@@ -49,6 +51,7 @@ class GeminiOAuthManager(
     private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
     private var callbackPort: Int? = null
     private val sessions = ConcurrentHashMap<String, String>()
+    private val callbackMutex = Mutex()
     private val _status = MutableStateFlow<GeminiOAuthStatus>(GeminiOAuthStatus.Idle)
     val status: StateFlow<GeminiOAuthStatus> = _status.asStateFlow()
 
@@ -87,7 +90,7 @@ class GeminiOAuthManager(
         _status.value = GeminiOAuthStatus.Idle
     }
 
-    private suspend fun ensureCallbackServer(): Int {
+    private suspend fun ensureCallbackServer(): Int = callbackMutex.withLock {
         callbackPort?.let { return it }
         var lastError: Throwable? = null
         for (port in CALLBACK_PORTS) {

@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.suspendCancellableCoroutine
 import me.rerere.common.http.await
 import me.rerere.rikkahub.R
@@ -45,6 +47,7 @@ class CodexOAuthManager(
     private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
     private var callbackPort: Int? = null
     private val sessions = ConcurrentHashMap<String, OAuthSession>()
+    private val callbackMutex = Mutex()
     private val _status = MutableStateFlow<CodexOAuthStatus>(CodexOAuthStatus.Idle)
     val status: StateFlow<CodexOAuthStatus> = _status.asStateFlow()
 
@@ -90,7 +93,7 @@ class CodexOAuthManager(
         _status.value = CodexOAuthStatus.Idle
     }
 
-    private suspend fun ensureCallbackServer(): Int {
+    private suspend fun ensureCallbackServer(): Int = callbackMutex.withLock {
         callbackPort?.let { return it }
         var lastError: Throwable? = null
         for (port in CALLBACK_PORTS) {
