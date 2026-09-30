@@ -26,6 +26,7 @@ data class GeminiAccount(
 enum class GeminiTokenStatus { UNKNOWN, AVAILABLE, EXPIRED, INVALID }
 
 internal fun GeminiAccount.isAvailable(nowMillis: Long = System.currentTimeMillis()): Boolean {
-    if (!enabled || tokenStatus == GeminiTokenStatus.INVALID) return false
-    return expiresAt > nowMillis
+    // Expired access tokens may still be usable: acquireAccount() refreshes them before use.
+    // Only disabled or permanently invalid accounts should be skipped here.
+    return enabled && tokenStatus != GeminiTokenStatus.INVALID
 }

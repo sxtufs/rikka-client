@@ -15,11 +15,17 @@ class RequestLoggingInterceptor : Interceptor {
         val request = chain.request()
         val startTime = System.currentTimeMillis()
 
-        val requestHeaders = request.headers.toMap()
-        val requestBody = request.body?.let { body ->
-            val buffer = Buffer()
-            body.writeTo(buffer)
-            buffer.readUtf8()
+        val requestHeaders = request.headers.toRedactedMap()
+        val requestBody = if (request.url.host in AUTH_HOSTS ||
+            request.body?.contentType()?.toString()?.startsWith("application/x-www-form-urlencoded") == true
+        ) {
+            "[REDACTED]"
+        } else {
+            request.body?.let { body ->
+                val buffer = Buffer()
+                body.writeTo(buffer)
+                buffer.readUtf8()
+            }
         }
 
         val response: Response
@@ -32,7 +38,7 @@ class RequestLoggingInterceptor : Interceptor {
             Logging.logRequest(
                 LogEntry.RequestLog(
                     tag = "HTTP",
-                    url = request.url.toString(),
+                    url = request.url.redacted().toString(),
                     method = request.method,
                     requestHeaders = requestHeaders,
                     requestBody = requestBody,
@@ -43,12 +49,12 @@ class RequestLoggingInterceptor : Interceptor {
         }
 
         val durationMs = System.currentTimeMillis() - startTime
-        val responseHeaders = response.headers.toMap()
+        val responseHeaders = response.headers.toRedactedMap()
 
         Logging.logRequest(
             LogEntry.RequestLog(
                 tag = "HTTP",
-                url = request.url.toString(),
+                url = request.url.redacted().toString(),
                 method = request.method,
                 requestHeaders = requestHeaders,
                 requestBody = requestBody,
@@ -62,13 +68,40 @@ class RequestLoggingInterceptor : Interceptor {
         return response
     }
 
-    private fun okhttp3.Headers.toMap(): Map<String, String> {
-        return names().associateWith { name ->
-            if (name.equals("Proxy-Authorization", ignoreCase = true)) {
-                "██"
-            } else {
-                get(name) ?: ""
-            }
+    private fun okhttp3.Headers.toRedactedMap(): Map<String, String> =
+        names().associateWith { name ->
+            if (name.lowercase() in SENSITIVE_HEADERS) "[REDACTED]" else get(name).orEmpty()
         }
+
+    private fun okhttp3.HttpUrl.redacted(): okhttp3.HttpUrl {
+        val builder = newBuilder()
+        queryParameterNames
+            .filter { it.lowercase() in SENSITIVE_QUERY_PARAMETERS }
+            .forEach { builder.setQueryParameter(it, "[REDACTED]") }
+        return builder.build()
+    }
+
+    private companion object {
+        val SENSITIVE_HEADERS = setOf(
+            "authorization",
+            "proxy-authorization",
+            "cookie",
+            "set-cookie",
+            "x-api-key",
+            "x-goog-api-key",
+        )
+        val SENSITIVE_QUERY_PARAMETERS = setOf(
+            "key",
+            "api_key",
+            "access_token",
+            "refresh_token",
+            "code",
+        )
+        val AUTH_HOSTS = setOf(
+            "auth.openai.com",
+            "auth.x.ai",
+            "oauth2.googleapis.com",
+            "accounts.google.com",
+        )
     }
 }

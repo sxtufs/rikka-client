@@ -253,8 +253,17 @@ val dataSourceModule = module {
             .addNetworkInterceptor(RequestLoggingInterceptor())
             .addInterceptor(AIRequestInterceptor())
             .addInterceptor(HttpLoggingInterceptor().apply {
+                redactHeader("Authorization")
                 redactHeader("Proxy-Authorization")
-                level = HttpLoggingInterceptor.Level.HEADERS
+                redactHeader("Cookie")
+                redactHeader("Set-Cookie")
+                redactHeader("X-API-Key")
+                redactHeader("X-Goog-Api-Key")
+                level = if (BuildConfig.DEBUG) {
+                    HttpLoggingInterceptor.Level.HEADERS
+                } else {
+                    HttpLoggingInterceptor.Level.NONE
+                }
             })
             .build()
         client.also { SearchService.init(it, get()) }

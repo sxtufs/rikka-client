@@ -18,6 +18,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import me.rerere.ai.core.MessageRole
 import me.rerere.ai.provider.ImageGenerationParams
@@ -179,7 +180,7 @@ class GeminiProvider(
      * function only needs to report whether anything was already sent downstream
      * ([GeminiStreamAttemptOutcome.Failure.emitted]), since that is what makes a retry unsafe.
      */
-    private suspend fun ProducerScope.runStreamAttempt(
+    private suspend fun ProducerScope<StreamChunk>.runStreamAttempt(
         request: Request,
         decoder: CodeAssistStreamDecoder,
         account: GeminiAccount,
@@ -203,7 +204,7 @@ class GeminiProvider(
                         eventSource.cancel()
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "onEvent: failed to parse chunk, payload=${data.take(PAYLOAD_LOG_LIMIT)}", e)
+                    Log.w(TAG, "onEvent: failed to parse chunk", e)
                 }
             }
 
@@ -245,8 +246,6 @@ class GeminiProvider(
 
     private companion object {
         val JSON_MEDIA_TYPE = "application/json".toMediaType()
-        // Keep the diagnostic log line readable; the payload can be many KB of candidate text.
-        const val PAYLOAD_LOG_LIMIT = 500
     }
 }
 

@@ -79,6 +79,7 @@ class CodexOAuthManager(
                 )
                 val tokenJson = buildJsonObject {
                     put("access_token", token.accessToken)
+                    token.idToken?.let { put("id_token", it) }
                     token.refreshToken?.let { put("refresh_token", it) }
                     token.expiresIn?.let { put("expires_in", it) }
                     put("token_type", token.tokenType)
