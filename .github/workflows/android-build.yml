@@ -92,7 +92,7 @@ jobs:
           chmod +x gradlew
           ./gradlew test --stacktrace
 
-      - name: Run lint (advisory)
+      - name: Run lint advisory
         continue-on-error: true
         run: ./gradlew lint --stacktrace
 
