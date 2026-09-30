@@ -50,7 +50,7 @@ internal fun OAuthProviderConfigureScreen(
     onEdit: (ProviderSetting) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text(provider.name, style = MaterialTheme.typography.headlineMedium)
+        Text(provider.name, style = MaterialTheme.typography.headlineSmall)
 
         when (provider) {
             is ProviderSetting.Codex -> CodexOAuthConfigure(provider, onEdit)
@@ -75,7 +75,7 @@ private fun CodexOAuthConfigure(
 
     Text(
         "Uses the OpenAI Codex OAuth and Responses API flow. This integration depends on Codex service compatibility.",
-        style = MaterialTheme.typography.bodyLarge,
+        style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Button(onClick = manager::startLogin, modifier = Modifier.fillMaxWidth()) {
@@ -125,7 +125,7 @@ private fun GrokOAuthConfigure(
 
     Text(
         "Uses your xAI Grok subscription (SuperGrok or X Premium+) via OAuth device sign-in and the xAI Responses API. Requires an active subscription; no API key needed.",
-        style = MaterialTheme.typography.bodyLarge,
+        style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Button(onClick = manager::startLogin, modifier = Modifier.fillMaxWidth()) {
@@ -175,7 +175,7 @@ private fun GeminiOAuthConfigure(
 
     Text(
         "Signs in with a Google account and generates through Google Cloud Code Assist, the same backend Antigravity uses. No API key needed.",
-        style = MaterialTheme.typography.bodyLarge,
+        style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Card(
@@ -189,10 +189,10 @@ private fun GeminiOAuthConfigure(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("This may get your Google account banned", style = MaterialTheme.typography.titleLarge)
+            Text("This may get your Google account banned", style = MaterialTheme.typography.titleMedium)
             Text(
                 "This provider signs in with Antigravity's own OAuth credentials and calls a private Google endpoint from an app Google did not publish. Google's terms let them suspend or terminate accounts for accessing their services through unapproved clients, and there is no appeal path built for this. Use a throwaway Google account you can afford to lose, never one tied to your email, photos, purchases, or work.",
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
             )
         }
     }
@@ -243,7 +243,7 @@ private fun OAuthEnableRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.titleLarge)
+            Text(label, style = MaterialTheme.typography.titleMedium)
             Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(
@@ -265,7 +265,7 @@ private fun AccountsHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Accounts ($count)", style = MaterialTheme.typography.titleLarge)
+        Text("Accounts ($count)", style = MaterialTheme.typography.titleMedium)
         OutlinedButton(onClick = onRefresh, enabled = enabled) {
             Text("Check status")
         }
@@ -279,7 +279,7 @@ private fun EmptyAccountsText(text: String) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 48.dp),
-        style = MaterialTheme.typography.bodyLarge,
+        style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
@@ -396,7 +396,7 @@ private fun OAuthAccountCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(title, style = MaterialTheme.typography.titleLarge)
+                    Text(title, style = MaterialTheme.typography.titleMedium)
                     if (subtitle.isNotBlank()) {
                         Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
