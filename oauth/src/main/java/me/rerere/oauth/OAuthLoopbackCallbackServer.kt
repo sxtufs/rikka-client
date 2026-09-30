@@ -16,20 +16,12 @@ import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
-import java.net.InetSocketAddress
-import java.net.Socket
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 data class OAuthCallback(
     val code: String?,
@@ -47,7 +39,6 @@ data class OAuthCallback(
 class OAuthLoopbackCallbackServer(
     private val port: Int = 0,
     callbackPath: String = "/oauth/callback",
-    private val redirectHost: String = LOOPBACK_HOST,
 ) {
     private class CallbackRegistration {
         val result = CompletableDeferred<OAuthCallback>()
@@ -135,30 +126,13 @@ class OAuthLoopbackCallbackServer(
         try {
             newServer.startSuspend(wait = false)
             val resolvedPort = newServer.engine.resolvedConnectors().single().port
-            awaitListeningPort(resolvedPort)
-            return "http://$redirectHost:$resolvedPort$callbackPath".also {
+            return "http://$LOOPBACK_HOST:$resolvedPort$callbackPath".also {
                 server = newServer
                 redirectUri = it
             }
         } catch (e: Exception) {
             runCatching { newServer.stop(gracePeriodMillis = 0, timeoutMillis = 1_000) }
             throw e
-        }
-    }
-
-    private suspend fun awaitListeningPort(port: Int) {
-        withTimeout(2.seconds) {
-            while (true) {
-                val ready = withContext(Dispatchers.IO) {
-                    runCatching {
-                        Socket().use { socket ->
-                            socket.connect(InetSocketAddress(LOOPBACK_HOST, port), 100)
-                        }
-                    }.isSuccess
-                }
-                if (ready) return@withTimeout
-                delay(10.milliseconds)
-            }
         }
     }
 
@@ -210,19 +184,6 @@ class OAuthLoopbackCallbackServer(
             )
         } finally {
             registration.result.complete(result)
-        }
-    }
-
-    /**
-     * Closes an owner that failed before it could receive a session handle. This is important
-     * for fixed-port providers: cancellation can happen between [openSession] returning and
-     * the caller assigning the returned session.
-     */
-    suspend fun close() {
-        lifecycleMutex.withLock {
-            callbacks.values.forEach { it.result.cancel() }
-            callbacks.clear()
-            stopServerIfIdle()
         }
     }
 

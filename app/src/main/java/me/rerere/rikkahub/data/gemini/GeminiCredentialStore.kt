@@ -13,7 +13,10 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-internal class GeminiCredentialStore(context: Context, private val json: Json) {
+internal class GeminiCredentialStore(
+    context: Context,
+    private val json: Json,
+) {
     private val file = File(context.noBackupFilesDir, FILE_NAME)
 
     fun read(): GeminiAccountState {
@@ -21,16 +24,14 @@ internal class GeminiCredentialStore(context: Context, private val json: Json) {
         return runCatching {
             val bytes = file.readBytes()
             require(bytes.size > IV_SIZE)
+            val iv = bytes.copyOfRange(0, IV_SIZE)
+            val encrypted = bytes.copyOfRange(IV_SIZE, bytes.size)
             val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(
-                Cipher.DECRYPT_MODE,
-                getOrCreateKey(),
-                GCMParameterSpec(TAG_LENGTH, bytes.copyOfRange(0, IV_SIZE)),
-            )
-            json.decodeFromString<GeminiAccountState>(
-                cipher.doFinal(bytes.copyOfRange(IV_SIZE, bytes.size)).decodeToString()
-            )
-        }.getOrElse { GeminiAccountState() }
+            cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(TAG_LENGTH, iv))
+            json.decodeFromString<GeminiAccountState>(cipher.doFinal(encrypted).decodeToString())
+        }.getOrElse {
+            GeminiAccountState()
+        }
     }
 
     fun write(state: GeminiAccountState) {
@@ -47,11 +48,15 @@ internal class GeminiCredentialStore(context: Context, private val json: Json) {
         val keyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
         (keyStore.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
         return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE).run {
-            init(KeyGenParameterSpec.Builder(
-                KEY_ALIAS,
-                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
-            ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build())
+            init(
+                KeyGenParameterSpec.Builder(
+                    KEY_ALIAS,
+                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+                )
+                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .build()
+            )
             generateKey()
         }
     }

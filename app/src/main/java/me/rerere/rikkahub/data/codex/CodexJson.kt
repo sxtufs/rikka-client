@@ -52,7 +52,11 @@ internal fun parseCodexUsage(headers: Headers): CodexUsageSnapshot? {
         val resetsAt = headers["x-codex-$prefix-reset-at"]?.toLongOrNull()
             ?: headers["x-codex-$prefix-reset-after-seconds"]?.toLongOrNull()
                 ?.let { System.currentTimeMillis() / 1000 + it }
-        return CodexUsageWindow(usedPercent = used, windowMinutes = windowMinutes, resetsAt = resetsAt)
+        return CodexUsageWindow(
+            usedPercent = used,
+            windowMinutes = windowMinutes,
+            resetsAt = resetsAt,
+        )
     }
     val primary = window("primary")
     val secondary = window("secondary")

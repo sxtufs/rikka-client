@@ -1,7 +1,6 @@
 package me.rerere.rikkahub.data.codex
 
 import android.os.Build
-import me.rerere.rikkahub.AppScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
@@ -15,6 +14,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import me.rerere.ai.core.MessageRole
@@ -35,6 +35,7 @@ import me.rerere.ai.ui.StreamChunk
 import me.rerere.ai.ui.StreamChunkHandler
 import me.rerere.ai.ui.UIMessage
 import me.rerere.common.http.await
+import me.rerere.rikkahub.AppScope
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -46,25 +47,28 @@ class CodexProvider(
     private val json: Json,
     private val scope: AppScope,
 ) : Provider<ProviderSetting.Codex> {
+
     override suspend fun listModels(providerSetting: ProviderSetting.Codex): List<Model> =
         withContext(Dispatchers.IO) {
             val account = repository.acquireAccount()
-            val response = client.newCall(
-                Request.Builder()
-                    .url("$CODEX_API_BASE/models?client_version=$CLIENT_VERSION")
-                    .codexHeaders(account)
-                    .get()
-                    .build()
-            ).await()
+            val request = Request.Builder()
+                .url("$CODEX_API_BASE/models?client_version=$CLIENT_VERSION")
+                .codexHeaders(account)
+                .get()
+                .build()
+            val response = client.newCall(request).await()
             if (!response.isSuccessful) {
                 if (response.code == 401) repository.markInvalid(account.id)
-                error("Failed to get Codex models (HTTP ${response.code})")
+                error("Failed to get Codex models: ${response.code} ${response.body.string()}")
             }
             val models = (json.parseToJsonElement(response.body.string()) as? JsonObject)
-                ?.get("models") as? JsonArray ?: return@withContext emptyList()
+                ?.get("models") as? JsonArray
+                ?: return@withContext emptyList()
             models.mapNotNull { element ->
                 val item = element as? JsonObject ?: return@mapNotNull null
-                if (item["visibility"]?.jsonPrimitive?.contentOrNull != "list") return@mapNotNull null
+                if (item["visibility"]?.jsonPrimitive?.contentOrNull != "list") {
+                    return@mapNotNull null
+                }
                 val slug = item["slug"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
                 val modalities = item["input_modalities"]?.jsonArray
                     ?.mapNotNull { modality ->
@@ -73,7 +77,8 @@ class CodexProvider(
                             "image" -> Modality.IMAGE
                             else -> null
                         }
-                    }?.ifEmpty { listOf(Modality.TEXT) }
+                    }
+                    ?.ifEmpty { listOf(Modality.TEXT) }
                     ?: listOf(Modality.TEXT, Modality.IMAGE)
                 Model(
                     modelId = slug,
@@ -81,9 +86,12 @@ class CodexProvider(
                     inputModalities = modalities,
                     abilities = buildList {
                         add(ModelAbility.TOOL)
-                        if (item["supported_reasoning_levels"]?.jsonArray?.isNotEmpty() == true ||
+                        if (
+                            item["supported_reasoning_levels"]?.jsonArray?.isNotEmpty() == true ||
                             item["supports_reasoning_summaries"]?.jsonPrimitive?.booleanOrNull == true
-                        ) add(ModelAbility.REASONING)
+                        ) {
+                            add(ModelAbility.REASONING)
+                        }
                     },
                 )
             }
@@ -94,9 +102,8 @@ class CodexProvider(
         messages: List<UIMessage>,
         params: TextGenerationParams,
     ): TextGenerationResult {
-        // The Codex backend requires stream=true even for callers requesting a complete result.
-        // Consume the stream here so connection tests, tool calls and non-stream app flows all
-        // use the same working transport.
+        // The Codex endpoint requires stream=true, including for callers that request a
+        // complete response. Consume the streaming path into one result for those callers.
         var collected = listOf(UIMessage(role = MessageRole.ASSISTANT, parts = emptyList()))
         val handler = StreamChunkHandler(params.model)
         streamText(providerSetting, messages, params).collect { chunk ->
@@ -118,45 +125,56 @@ class CodexProvider(
     ): Flow<StreamChunk> {
         val account = repository.acquireAccount()
         return responseApiFor(account).streamText(
-            syntheticSetting(providerSetting, account),
-            withDefaultInstructions(messages),
-            withCodexParams(params, account, stream = true),
+            providerSetting = syntheticSetting(providerSetting, account),
+            messages = withDefaultInstructions(messages),
+            params = withCodexParams(params, account, stream = true),
         )
     }
 
     override suspend fun generateImage(
         providerSetting: ProviderSetting,
         params: ImageGenerationParams,
-    ): Flow<ImageGenerationItem> = error("Image generation is not supported by Codex")
+    ): Flow<ImageGenerationItem> {
+        error("Image generation is not supported by the Codex provider")
+    }
 
-    private fun Request.Builder.codexHeaders(account: CodexAccount): Request.Builder =
-        header("Authorization", "Bearer ${account.accessToken}")
+    private fun Request.Builder.codexHeaders(account: CodexAccount): Request.Builder {
+        return header("Authorization", "Bearer ${account.accessToken}")
             .header("ChatGPT-Account-Id", account.chatgptAccountId)
             .header("OpenAI-Beta", "responses=experimental")
             .header("originator", "codex_cli_rs")
             .header("User-Agent", CODEX_USER_AGENT)
+    }
 
-    private fun syntheticSetting(setting: ProviderSetting.Codex, account: CodexAccount) =
+    // apiKey = the account's own OAuth token, so ResponseAPI's normal "Authorization: Bearer
+    // <apiKey>" header lands on exactly the token codexHeaders used to set by hand.
+    private fun syntheticSetting(providerSetting: ProviderSetting.Codex, account: CodexAccount) =
         ProviderSetting.OpenAI(
-            id = setting.id,
-            enabled = setting.enabled,
-            name = setting.name,
-            models = setting.models,
+            id = providerSetting.id,
+            enabled = providerSetting.enabled,
+            name = providerSetting.name,
+            models = providerSetting.models,
             baseUrl = CODEX_API_BASE,
             apiKey = account.accessToken,
             useResponseApi = true,
         )
 
+    // The Codex backend needs a system/instructions item to behave; fall back to a generic one
+    // when the caller didn't supply a system message, same as the request body used to do by
+    // hand via the `instructions` field.
     private fun withDefaultInstructions(messages: List<UIMessage>): List<UIMessage> =
-        if (messages.any { it.role == MessageRole.SYSTEM }) messages
-        else listOf(UIMessage.system(DEFAULT_INSTRUCTIONS)) + messages
+        if (messages.any { it.role == MessageRole.SYSTEM }) {
+            messages
+        } else {
+            listOf(UIMessage.system(DEFAULT_INSTRUCTIONS)) + messages
+        }
 
     private fun withCodexParams(
         params: TextGenerationParams,
         account: CodexAccount,
         stream: Boolean,
     ): TextGenerationParams {
-        val effort = params.model.abilities
+        val reasoningEffort = params.model.abilities
             .takeIf { it.contains(ModelAbility.REASONING) }
             ?.let { codexReasoningEffort(params.reasoningLevel) }
         return params.copy(
@@ -168,16 +186,26 @@ class CodexProvider(
                 if (stream) add(CustomHeader("Accept", "text/event-stream"))
             },
             customBody = params.customBody + listOfNotNull(
-                effort?.let { value ->
-                    CustomBody("reasoning", buildJsonObject {
-                        put("effort", value)
-                        put("summary", "auto")
-                    })
-                }
+                reasoningEffort?.let { effort ->
+                    CustomBody(
+                        key = "reasoning",
+                        value = buildJsonObject {
+                            put("effort", effort)
+                            put("summary", "auto")
+                        },
+                    )
+                },
             ),
         )
     }
 
+    /**
+     * Wraps [client] with an account-scoped interceptor so the same response that carries the
+     * model reply also carries the account's rate-limit headers (quota tracking) and a 401
+     * (invalidated token) signal, without a second network round-trip. Also patches a missing
+     * Content-Type so OkHttp's SSE factory recognizes the stream - some Codex backend responses
+     * omit it.
+     */
     private fun responseApiFor(account: CodexAccount): ResponseAPI {
         val accountAwareClient = client.newBuilder()
             .addNetworkInterceptor { chain ->
@@ -210,17 +238,43 @@ class CodexProvider(
     private companion object {
         const val CODEX_API_BASE = "${CodexAccountRepository.CODEX_BASE_URL}/codex"
         const val CLIENT_VERSION = "0.144.5"
+
+        // The Codex backend routes newer models (e.g. gpt-5.6-luna, which is gated on
+        // minimal_client_version 0.144.0) by the codex version advertised in the User-Agent, not
+        // just the `client_version` query param on /models. Without a codex-shaped UA the backend
+        // resolves the public slug to an unavailable internal engine and returns 404 "Model not
+        // found". Mirror the codex CLI's UA format: "<originator>/<version> (<os>; <arch>)".
+        val CODEX_USER_AGENT =
+            "codex_cli_rs/$CLIENT_VERSION (Android ${Build.VERSION.RELEASE}; " +
+                "${Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64"})"
         const val DEFAULT_INSTRUCTIONS = "You are a helpful assistant."
-        val CODEX_USER_AGENT = "codex_cli_rs/$CLIENT_VERSION (Android ${Build.VERSION.RELEASE}; " +
-            "${Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64"})"
     }
 }
 
-internal fun codexReasoningEffort(level: ReasoningLevel): String? = when (level) {
-    ReasoningLevel.AUTO -> null
-    ReasoningLevel.OFF -> "none"
-    ReasoningLevel.LOW -> "low"
-    ReasoningLevel.MEDIUM -> "medium"
-    ReasoningLevel.HIGH -> "high"
-    ReasoningLevel.XHIGH, ReasoningLevel.MAX -> "xhigh"
+internal fun codexReasoningEffort(level: ReasoningLevel): String? {
+    return when (level) {
+        ReasoningLevel.AUTO -> null
+        ReasoningLevel.LOW -> "low"
+        ReasoningLevel.MEDIUM -> "medium"
+        ReasoningLevel.HIGH -> "high"
+        ReasoningLevel.XHIGH -> "xhigh"
+        // Codex's API tops out at "xhigh"; mirror XHIGH rather than sending an effort it doesn't know.
+        ReasoningLevel.MAX -> "xhigh"
+        ReasoningLevel.OFF -> "none"
+    }
+}
+
+internal fun parseCodexIncompleteMessage(payload: JsonObject): String {
+    val reason = runCatching {
+        payload["response"]?.jsonObject
+            ?.get("incomplete_details")?.jsonObject
+            ?.get("reason")?.jsonPrimitive?.contentOrNull
+            ?: payload["incomplete_details"]?.jsonObject
+                ?.get("reason")?.jsonPrimitive?.contentOrNull
+    }.getOrNull()
+    return if (reason.isNullOrBlank()) {
+        "Codex response incomplete"
+    } else {
+        "Codex response incomplete: $reason"
+    }
 }

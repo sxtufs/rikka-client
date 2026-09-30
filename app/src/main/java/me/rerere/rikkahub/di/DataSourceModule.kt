@@ -299,7 +299,6 @@ val dataSourceModule = module {
                     client = get(),
                     repository = get(),
                     json = get(),
-                    scope = get(),
                 )
             )
         }

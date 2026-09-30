@@ -5,7 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import kotlinx.coroutines.CancellationException
-import me.rerere.rikkahub.AppScope
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -31,7 +31,7 @@ import okhttp3.Request
  */
 class GrokOAuthManager(
     private val context: Context,
-    private val scope: AppScope,
+    private val scope: CoroutineScope,
     private val client: OkHttpClient,
     private val repository: GrokAccountRepository,
     private val json: Json,
@@ -68,15 +68,6 @@ class GrokOAuthManager(
         _status.value = GrokOAuthStatus.Idle
     }
 
-    fun logout() {
-        pollJob?.cancel()
-        pollJob = null
-        scope.launch {
-            repository.accounts.value.toList().forEach { repository.delete(it.id) }
-            _status.value = GrokOAuthStatus.Idle
-        }
-    }
-
     fun consumeResult() {
         _status.value = GrokOAuthStatus.Idle
     }
@@ -87,29 +78,27 @@ class GrokOAuthManager(
                 .url(DEVICE_CODE_URL)
                 .header("User-Agent", USER_AGENT)
                 .header("Accept", "application/json")
-                .post(FormBody.Builder().add("client_id", CLIENT_ID).add("scope", SCOPE).build())
+                .post(
+                    FormBody.Builder()
+                        .add("client_id", CLIENT_ID)
+                        .add("scope", SCOPE)
+                        .build()
+                )
                 .build()
         ).await()
         val body = response.body.string()
-        if (!response.isSuccessful) error("Device authorization failed (HTTP ${response.code})")
+        if (!response.isSuccessful) {
+            error("Device authorization failed: ${response.code} $body")
+        }
         val obj = json.parseToJsonElement(body).jsonObject
         fun str(key: String) = obj[key]?.jsonPrimitive?.contentOrNull
-        val verificationUri = requireHttpsUrl(
-            str("verification_uri")
-                ?: str("verification_uri_complete")
-                ?: error("Missing verification_uri")
-        )
-        val verificationUriComplete = str("verification_uri_complete")?.let(::requireHttpsUrl)
-            ?.also { complete ->
-                require(Uri.parse(complete).host.equals(Uri.parse(verificationUri).host, ignoreCase = true)) {
-                    "xAI returned an unexpected verification host"
-                }
-            }
         DeviceAuthorization(
             deviceCode = str("device_code") ?: error("Missing device_code"),
             userCode = str("user_code") ?: error("Missing user_code"),
-            verificationUri = verificationUri,
-            verificationUriComplete = verificationUriComplete,
+            verificationUri = str("verification_uri")
+                ?: str("verification_uri_complete")
+                ?: error("Missing verification_uri"),
+            verificationUriComplete = str("verification_uri_complete"),
             intervalSeconds = (obj["interval"]?.jsonPrimitive?.intOrNull ?: 5).coerceAtLeast(1),
             expiresAtMillis = System.currentTimeMillis() +
                 (obj["expires_in"]?.jsonPrimitive?.intOrNull ?: 600) * 1000L,
@@ -119,7 +108,9 @@ class GrokOAuthManager(
     private suspend fun pollForToken(device: DeviceAuthorization): GrokAccount {
         var intervalMs = device.intervalSeconds * 1000L
         while (true) {
-            if (System.currentTimeMillis() > device.expiresAtMillis) error("The sign-in code expired")
+            if (System.currentTimeMillis() > device.expiresAtMillis) {
+                error("The sign-in code expired. Please try again.")
+            }
             delay(intervalMs)
             val response = withContext(Dispatchers.IO) {
                 client.newCall(
@@ -131,7 +122,8 @@ class GrokOAuthManager(
                             FormBody.Builder()
                                 .add("grant_type", DEVICE_CODE_GRANT_TYPE)
                                 .add("device_code", device.deviceCode)
-                                .add("client_id", CLIENT_ID).build()
+                                .add("client_id", CLIENT_ID)
+                                .build()
                         )
                         .build()
                 ).await()
@@ -140,33 +132,26 @@ class GrokOAuthManager(
             if (response.isSuccessful) {
                 return repository.saveLogin(body)
             }
-            when (val err = runCatching {
-                json.parseToJsonElement(body).jsonObject["error"]?.jsonPrimitive?.contentOrNull
+            when (val err = json.runCatching {
+                parseToJsonElement(body).jsonObject["error"]?.jsonPrimitive?.contentOrNull
             }.getOrNull()) {
                 "authorization_pending" -> Unit
                 "slow_down" -> intervalMs += 5000L
-                "expired_token" -> error("The sign-in code expired")
-                "access_denied" -> error("Sign-in was denied")
+                "expired_token" -> error("The sign-in code expired. Please try again.")
+                "access_denied" -> error("Sign-in was denied.")
                 else -> error("Grok sign-in failed: ${err ?: response.code}")
             }
         }
     }
 
     private fun openBrowser(url: String) {
-        val safeUrl = requireHttpsUrl(url)
-        context.startActivity(
-            Intent(Intent.ACTION_VIEW, Uri.parse(safeUrl)).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        )
-    }
-
-    private fun requireHttpsUrl(raw: String): String {
-        val uri = Uri.parse(raw)
-        require(uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()) {
-            "xAI returned an invalid verification URL"
+        runCatching {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            )
         }
-        return uri.toString()
     }
 
     companion object {
@@ -193,7 +178,11 @@ private data class DeviceAuthorization(
 sealed interface GrokOAuthStatus {
     data object Idle : GrokOAuthStatus
     data object Starting : GrokOAuthStatus
-    data class AwaitingApproval(val userCode: String, val verificationUri: String) : GrokOAuthStatus
+    data class AwaitingApproval(
+        val userCode: String,
+        val verificationUri: String,
+    ) : GrokOAuthStatus
+
     data class Success(val accountId: String) : GrokOAuthStatus
     data class Error(val message: String) : GrokOAuthStatus
 }

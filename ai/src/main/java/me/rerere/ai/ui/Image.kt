@@ -21,3 +21,11 @@ enum class ImageGenSize(val value: String) {
     LANDSCAPE_1792("1792x1024"),
     PORTRAIT_1792("1024x1792"),
 }
+
+
+@Serializable
+enum class ImageAspectRatio {
+    SQUARE,
+    LANDSCAPE,
+    PORTRAIT,
+}

@@ -23,11 +23,18 @@ class CodexAccountRepository internal constructor(
 ) {
     private val mutex = Mutex()
     private var state = store.read().let { stored ->
-        stored.copy(accounts = stored.accounts.map { account ->
-            if (account.tokenStatus != CodexTokenStatus.INVALID &&
-                account.expiresAt <= System.currentTimeMillis()
-            ) account.copy(tokenStatus = CodexTokenStatus.EXPIRED) else account
-        })
+        stored.copy(
+            accounts = stored.accounts.map { account ->
+                if (
+                    account.tokenStatus != CodexTokenStatus.INVALID &&
+                    account.expiresAt <= System.currentTimeMillis()
+                ) {
+                    account.copy(tokenStatus = CodexTokenStatus.EXPIRED)
+                } else {
+                    account
+                }
+            }
+        )
     }
     private val _accounts = MutableStateFlow(state.accounts)
     val accounts: StateFlow<List<CodexAccount>> = _accounts.asStateFlow()
@@ -35,14 +42,18 @@ class CodexAccountRepository internal constructor(
     suspend fun saveLogin(tokenJson: String): CodexAccount = mutex.withLock {
         val token = json.parseToJsonElement(tokenJson).jsonObject
         val identity = parseCodexIdentity(
-            token["id_token"]?.jsonPrimitive?.contentOrNull ?: error("Missing ID token"),
-            json,
+            idToken = token["id_token"]?.jsonPrimitive?.contentOrNull
+                ?: error("Missing ID token"),
+            json = json,
         )
+        val now = System.currentTimeMillis()
         val existing = state.accounts.firstOrNull {
             it.chatgptAccountId == identity.accountId &&
                 if (it.userId.isNotBlank() && identity.userId.isNotBlank()) {
                     it.userId == identity.userId
-                } else it.email == identity.email
+                } else {
+                    it.email == identity.email
+                }
         }
         val account = CodexAccount(
             id = existing?.id ?: "${identity.userId.ifBlank { identity.email }}:${identity.accountId}",
@@ -53,26 +64,35 @@ class CodexAccountRepository internal constructor(
             accessToken = token["access_token"]?.jsonPrimitive?.contentOrNull
                 ?: error("Missing access token"),
             refreshToken = token["refresh_token"]?.jsonPrimitive?.contentOrNull
-                ?: existing?.refreshToken ?: error("Missing refresh token"),
-            expiresAt = System.currentTimeMillis() +
-                (token["expires_in"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 3600L) * 1000,
+                ?: existing?.refreshToken
+                ?: error("Missing refresh token"),
+            expiresAt = now + (
+                token["expires_in"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 3600L
+                ) * 1000,
             enabled = existing?.enabled ?: true,
             tokenStatus = CodexTokenStatus.AVAILABLE,
             usage = existing?.usage,
         )
-        updateState(state.copy(accounts = state.accounts.filterNot { it.id == account.id } + account))
+        updateState(
+            state.copy(
+                accounts = state.accounts.filterNot { it.id == account.id } + account
+            )
+        )
         account
     }
 
     suspend fun acquireAccount(): CodexAccount = mutex.withLock {
         if (state.accounts.isEmpty()) error("No Codex account is signed in")
         repeat(state.accounts.size) {
-            val index = selectCodexAccountIndex(state.accounts, state.nextAccountIndex)
-                ?: error("No available Codex account")
+            val index = selectCodexAccountIndex(
+                accounts = state.accounts,
+                startIndex = state.nextAccountIndex,
+            ) ?: error("No available Codex account")
             val candidate = state.accounts[index]
+            if (!candidate.isAvailable()) return@repeat
             updateState(state.copy(nextAccountIndex = (index + 1) % state.accounts.size))
-            val fresh = runCatching { ensureFreshLocked(candidate) }.getOrNull()
-            if (fresh != null) return fresh
+            val fresh = runCatching { ensureFreshLocked(candidate) }.getOrNull() ?: return@repeat
+            return fresh
         }
         error("No available Codex account")
     }
@@ -90,44 +110,64 @@ class CodexAccountRepository internal constructor(
     }
 
     suspend fun delete(accountId: String) = mutex.withLock {
-        updateState(state.copy(accounts = state.accounts.filterNot { it.id == accountId }, nextAccountIndex = 0))
+        updateState(
+            state.copy(
+                accounts = state.accounts.filterNot { it.id == accountId },
+                nextAccountIndex = 0,
+            )
+        )
     }
 
     suspend fun refreshAccount(accountId: String): CodexAccount = mutex.withLock {
         val account = state.accounts.firstOrNull { it.id == accountId }
             ?: error("Codex account not found")
-        fetchUsageLocked(ensureFreshLocked(account, force = true))
+        val fresh = ensureFreshLocked(account)
+        fetchUsageLocked(fresh)
     }
 
     suspend fun refreshAll() {
-        accounts.value.forEach { account -> runCatching { refreshAccount(account.id) } }
+        accounts.value.forEach { account ->
+            runCatching { refreshAccount(account.id) }
+        }
     }
 
-    private suspend fun ensureFreshLocked(account: CodexAccount, force: Boolean = false): CodexAccount {
-        if (!force && account.expiresAt > System.currentTimeMillis() + REFRESH_MARGIN_MS) return account
+    private suspend fun ensureFreshLocked(
+        account: CodexAccount,
+        force: Boolean = false,
+    ): CodexAccount {
+        if (!force && account.expiresAt > System.currentTimeMillis() + REFRESH_MARGIN_MS) {
+            return account
+        }
         val response = withContext(Dispatchers.IO) {
-            val form = FormBody.Builder()
+            val body = FormBody.Builder()
                 .add("grant_type", "refresh_token")
                 .add("client_id", CodexOAuthManager.CLIENT_ID)
                 .add("refresh_token", account.refreshToken)
                 .add("scope", CodexOAuthManager.REFRESH_SCOPES)
                 .build()
-            client.newCall(Request.Builder().url(CodexOAuthManager.TOKEN_URL).post(form).build()).await()
+            client.newCall(
+                Request.Builder()
+                    .url(CodexOAuthManager.TOKEN_URL)
+                    .post(body)
+                    .build()
+            ).await()
         }
-        val body = response.body.string()
+        val responseBody = response.body.string()
         if (!response.isSuccessful) {
-            if (isCodexRefreshAuthenticationFailure(response.code, body, json)) {
+            if (isCodexRefreshAuthenticationFailure(response.code, responseBody, json)) {
                 replaceAccount(account.id) { it.copy(tokenStatus = CodexTokenStatus.INVALID) }
             }
             error("Token refresh failed: ${response.code}")
         }
-        val token = json.parseToJsonElement(body).jsonObject
+        val token = json.parseToJsonElement(responseBody).jsonObject
         val updated = account.copy(
             accessToken = token["access_token"]?.jsonPrimitive?.contentOrNull
                 ?: error("Missing refreshed access token"),
-            refreshToken = token["refresh_token"]?.jsonPrimitive?.contentOrNull ?: account.refreshToken,
-            expiresAt = System.currentTimeMillis() +
-                (token["expires_in"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 3600L) * 1000,
+            refreshToken = token["refresh_token"]?.jsonPrimitive?.contentOrNull
+                ?: account.refreshToken,
+            expiresAt = System.currentTimeMillis() + (
+                token["expires_in"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 3600L
+                ) * 1000,
             tokenStatus = CodexTokenStatus.AVAILABLE,
         )
         replaceAccount(account.id) { updated }
@@ -145,25 +185,38 @@ class CodexAccountRepository internal constructor(
             ).await()
         }
         if (!response.isSuccessful) {
-            if (response.code == 401) replaceAccount(account.id) { it.copy(tokenStatus = CodexTokenStatus.INVALID) }
+            if (response.code == 401) {
+                replaceAccount(account.id) { it.copy(tokenStatus = CodexTokenStatus.INVALID) }
+            }
             error("Failed to fetch Codex usage: ${response.code}")
         }
+        val usage = parseCodexUsage(json.parseToJsonElement(response.body.string()).jsonObject)
         val updated = account.copy(
             tokenStatus = CodexTokenStatus.AVAILABLE,
-            usage = parseCodexUsage(json.parseToJsonElement(response.body.string()).jsonObject),
+            usage = usage,
         )
         replaceAccount(account.id) { updated }
         return updated
     }
 
-    private fun Request.Builder.codexHeaders(account: CodexAccount): Request.Builder =
-        addHeader("Authorization", "Bearer ${account.accessToken}")
+    private fun Request.Builder.codexHeaders(account: CodexAccount): Request.Builder {
+        return addHeader("Authorization", "Bearer ${account.accessToken}")
             .addHeader("ChatGPT-Account-Id", account.chatgptAccountId)
             .addHeader("originator", "codex_cli_rs")
             .addHeader("Accept", "application/json")
+    }
 
-    private fun replaceAccount(accountId: String, transform: (CodexAccount) -> CodexAccount) {
-        updateState(state.copy(accounts = state.accounts.map { if (it.id == accountId) transform(it) else it }))
+    private fun replaceAccount(
+        accountId: String,
+        transform: (CodexAccount) -> CodexAccount,
+    ) {
+        updateState(
+            state.copy(
+                accounts = state.accounts.map {
+                    if (it.id == accountId) transform(it) else it
+                }
+            )
+        )
     }
 
     private fun updateState(newState: CodexAccountState) {
@@ -178,11 +231,15 @@ class CodexAccountRepository internal constructor(
     }
 }
 
-internal fun isCodexRefreshAuthenticationFailure(statusCode: Int, body: String, json: Json): Boolean {
+internal fun isCodexRefreshAuthenticationFailure(
+    statusCode: Int,
+    responseBody: String,
+    json: Json,
+): Boolean {
     if (statusCode == 401) return true
     if (statusCode != 400) return false
     val errorCode = runCatching {
-        json.parseToJsonElement(body).jsonObject["error"]?.jsonPrimitive?.contentOrNull
+        json.parseToJsonElement(responseBody).jsonObject["error"]?.jsonPrimitive?.contentOrNull
     }.getOrNull()
     return errorCode == "invalid_grant" || errorCode == "invalid_token"
 }

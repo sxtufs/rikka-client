@@ -58,6 +58,8 @@ import com.dokar.sonner.Toaster
 import com.dokar.sonner.rememberToasterState
 import kotlinx.serialization.Serializable
 import me.rerere.rikkahub.data.datastore.SettingsStore
+import me.rerere.rikkahub.data.datastore.DEFAULT_CODEX_PROVIDER_ID
+import me.rerere.rikkahub.data.datastore.DEFAULT_GEMINI_OAUTH_PROVIDER_ID
 import me.rerere.rikkahub.data.db.DatabaseMigrationTracker
 import me.rerere.rikkahub.data.db.MigrationState
 import me.rerere.rikkahub.data.event.AppEvent
@@ -139,6 +141,11 @@ private const val ACTION_TRANSLATE = "me.rerere.rikkahub.action.TRANSLATE"
 private const val ACTION_IMAGE_GEN = "me.rerere.rikkahub.action.IMAGE_GEN"
 
 class RouteActivity : ComponentActivity() {
+    companion object {
+        const val EXTRA_OPEN_CODEX_SETTINGS = "open_codex_settings"
+        const val EXTRA_OPEN_GEMINI_SETTINGS = "open_gemini_settings"
+    }
+
     private val okHttpClient by inject<OkHttpClient>()
     private val settingsStore by inject<SettingsStore>()
     private var navStack: MutableList<NavKey>? = null
@@ -215,6 +222,16 @@ class RouteActivity : ComponentActivity() {
             // Compose 尚未创建导航栈，待就绪后处理。
             pendingIntents.addLast(intent)
             return
+        }
+        if (intent.getBooleanExtra(EXTRA_OPEN_CODEX_SETTINGS, false)) {
+            val destination = Screen.SettingProviderDetail(DEFAULT_CODEX_PROVIDER_ID.toString())
+            if (backStack.lastOrNull() != destination) backStack.add(destination)
+            intent.removeExtra(EXTRA_OPEN_CODEX_SETTINGS)
+        }
+        if (intent.getBooleanExtra(EXTRA_OPEN_GEMINI_SETTINGS, false)) {
+            val destination = Screen.SettingProviderDetail(DEFAULT_GEMINI_OAUTH_PROVIDER_ID.toString())
+            if (backStack.lastOrNull() != destination) backStack.add(destination)
+            intent.removeExtra(EXTRA_OPEN_GEMINI_SETTINGS)
         }
         val destination = when (intent.action) {
             ACTION_TRANSLATE -> Screen.Translator

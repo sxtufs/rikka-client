@@ -501,3 +501,20 @@ fun <T> List<T>.migrateToolNodes(
 
     return result
 }
+
+
+@Serializable
+data class MessageChunk(
+    val id: String,
+    val model: String,
+    val choices: List<UIMessageChoice>,
+    val usage: TokenUsage? = null,
+)
+
+@Serializable
+data class UIMessageChoice(
+    val index: Int,
+    val delta: UIMessage?,
+    val message: UIMessage?,
+    val finishReason: String?,
+)

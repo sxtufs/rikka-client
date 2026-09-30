@@ -7,6 +7,7 @@ import me.rerere.ai.core.ReasoningLevel
 import me.rerere.ai.core.Tool
 import me.rerere.ai.core.TokenUsage
 import me.rerere.ai.ui.ImageGenSize
+import me.rerere.ai.ui.ImageAspectRatio
 import me.rerere.ai.ui.ImageGenerationItem
 import me.rerere.ai.ui.StreamChunk
 import me.rerere.ai.ui.UIMessage
@@ -83,6 +84,7 @@ data class ImageGenerationParams(
     val prompt: String,
     val numOfImages: Int = 1,
     val size: String = ImageGenSize.AUTO.value,
+    val aspectRatio: ImageAspectRatio = ImageAspectRatio.SQUARE,
     val partialImages: Int = 2,
     val customHeaders: List<CustomHeader> = emptyList(),
     val customBody: List<CustomBody> = emptyList(),
@@ -95,6 +97,7 @@ data class ImageEditParams(
     val images: List<String>,
     val numOfImages: Int = 1,
     val size: String = ImageGenSize.AUTO.value,
+    val aspectRatio: ImageAspectRatio = ImageAspectRatio.SQUARE,
     val partialImages: Int = 2,
     val customHeaders: List<CustomHeader> = emptyList(),
     val customBody: List<CustomBody> = emptyList(),

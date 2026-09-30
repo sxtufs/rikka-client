@@ -2,31 +2,54 @@ package me.rerere.rikkahub.data.gemini
 
 import kotlinx.serialization.Serializable
 
+/**
+ * One signed-in Google account usable against Cloud Code Assist.
+ *
+ * [projectId] is the `cloudaicompanionProject` resolved once at sign-in through
+ * loadCodeAssist / onboardUser. Every generate request has to carry it, so it is stored with the
+ * tokens rather than rediscovered per request.
+ */
 @Serializable
 data class GeminiAccount(
     val id: String,
-    val userId: String = "",
     val name: String,
     val email: String = "",
-    /**
-     * The `cloudaicompanionProject` resolved once at sign-in. Every Code Assist generate request
-     * must carry it, so it is stored with the tokens rather than rediscovered per request.
-     * Optional for backward compatibility with accounts saved before this field existed; those
-     * will re-resolve lazily.
-     */
-    val projectId: String? = null,
+    val projectId: String,
     val accessToken: String,
     val refreshToken: String,
     val expiresAt: Long,
     val enabled: Boolean = true,
     val tokenStatus: GeminiTokenStatus = GeminiTokenStatus.UNKNOWN,
+    val usage: GeminiUsageSnapshot? = null,
+)
+
+/**
+ * What is left of the account's Code Assist quota.
+ *
+ * Cloud Code Assist reports quota per model rather than per account, so each window here is the
+ * scarcest reading across every model the account can reach: that is the one that will actually
+ * stop a request.
+ */
+@Serializable
+data class GeminiUsageSnapshot(
+    val daily: GeminiUsageWindow? = null,
+    val weekly: GeminiUsageWindow? = null,
+    val updatedAt: Long = System.currentTimeMillis(),
 )
 
 @Serializable
-enum class GeminiTokenStatus { UNKNOWN, AVAILABLE, EXPIRED, INVALID }
+data class GeminiUsageWindow(
+    val remainingFraction: Double,
+    val resetsAt: Long? = null, // epoch seconds
+)
 
-internal fun GeminiAccount.isAvailable(nowMillis: Long = System.currentTimeMillis()): Boolean {
-    // Expired access tokens may still be usable: acquireAccount() refreshes them before use.
-    // Only disabled or permanently invalid accounts should be skipped here.
-    return enabled && tokenStatus != GeminiTokenStatus.INVALID
+@Serializable
+enum class GeminiTokenStatus {
+    UNKNOWN,
+    AVAILABLE,
+    EXPIRED,
+    INVALID,
 }
+
+internal fun GeminiAccount.isAvailable(): Boolean =
+    enabled && tokenStatus != GeminiTokenStatus.INVALID

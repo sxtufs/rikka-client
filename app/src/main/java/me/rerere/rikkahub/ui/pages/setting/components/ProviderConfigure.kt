@@ -76,9 +76,9 @@ fun ProviderConfigure(
             is ProviderSetting.OpenAI -> ProviderConfigureOpenAI(provider, onEdit)
             is ProviderSetting.Google -> ProviderConfigureGoogle(provider, onEdit)
             is ProviderSetting.Claude -> ProviderConfigureClaude(provider, onEdit)
-            is ProviderSetting.Codex -> ProviderConfigureOAuth(provider, onEdit)
-            is ProviderSetting.Grok -> ProviderConfigureOAuth(provider, onEdit)
-            is ProviderSetting.GeminiOAuth -> ProviderConfigureOAuth(provider, onEdit)
+            is ProviderSetting.Codex -> CodexProviderConfigure(provider, onEdit)
+            is ProviderSetting.Grok -> GrokProviderConfigure(provider, onEdit)
+            is ProviderSetting.GeminiOAuth -> GeminiProviderConfigure(provider, onEdit)
         }
     }
 }
@@ -220,14 +220,6 @@ private val OFFICIAL_PROVIDER_HOSTS = setOf(
     GOOGLE_OFFICIAL_HOST,
     CLAUDE_OFFICIAL_HOST
 )
-
-@Composable
-private fun ProviderConfigureOAuth(
-    provider: ProviderSetting,
-    onEdit: (ProviderSetting) -> Unit,
-) {
-    OAuthProviderConfigureScreen(provider, onEdit)
-}
 
 @Composable
 private fun ProviderConfigureOpenAI(

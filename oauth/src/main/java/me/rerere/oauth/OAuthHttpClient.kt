@@ -54,7 +54,6 @@ class OAuthHttpClient(
     @Serializable
     data class TokenResponse(
         @SerialName("access_token") val accessToken: String,
-        @SerialName("id_token") val idToken: String? = null,
         @SerialName("token_type") val tokenType: String = "Bearer",
         @SerialName("expires_in") val expiresIn: Long? = null,
         @SerialName("refresh_token") val refreshToken: String? = null,
@@ -151,9 +150,7 @@ class OAuthHttpClient(
             .add("client_id", request.clientId)
             .add("code_verifier", request.codeVerifier)
             .apply {
-                request.clientSecret?.takeIf { it.isNotBlank() }?.let {
-                    add("client_secret", it)
-                }
+                if (!request.clientSecret.isNullOrBlank()) add("client_secret", request.clientSecret)
                 request.resources.forEach { add("resource", it) }
                 request.additionalParameters.forEach { (name, value) -> add(name, value) }
             }
@@ -168,12 +165,8 @@ class OAuthHttpClient(
                 .add("refresh_token", request.refreshToken)
                 .add("client_id", request.clientId)
                 .apply {
-                    request.clientSecret?.takeIf { it.isNotBlank() }?.let {
-                        add("client_secret", it)
-                    }
-                    request.scope?.takeIf { it.isNotBlank() }?.let {
-                        add("scope", it)
-                    }
+                    if (!request.clientSecret.isNullOrBlank()) add("client_secret", request.clientSecret)
+                    if (!request.scope.isNullOrBlank()) add("scope", request.scope)
                     request.resources.forEach { add("resource", it) }
                     request.additionalParameters.forEach { (name, value) -> add(name, value) }
                 }
@@ -195,9 +188,7 @@ class OAuthHttpClient(
         executeRaw(request).use { response ->
             val body = response.body.string()
             if (!response.isSuccessful) {
-                // OAuth error bodies are provider-controlled and may contain credential-shaped
-                // fields. Keep them out of UI/log exceptions; callers only need the status.
-                throw IOException("OAuth request failed (HTTP ${response.code})")
+                throw IOException("HTTP ${response.code} for ${request.url}: ${body.take(300)}")
             }
             return body
         }

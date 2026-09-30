@@ -40,6 +40,7 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FloatingToolbarDefaults.ScreenOffset
 import androidx.compose.material3.FloatingToolbarDefaults.floatingToolbarVerticalNestedScroll
 import androidx.compose.material3.HorizontalFloatingToolbar
@@ -59,6 +60,7 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -66,8 +68,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -78,6 +80,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -106,14 +109,10 @@ import me.rerere.rikkahub.ui.components.ai.ModelTypeTag
 import me.rerere.rikkahub.ui.components.ai.ProviderBalanceText
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.components.ui.AutoAIIcon
-import me.rerere.rikkahub.ui.components.ui.ItemAction
-import me.rerere.rikkahub.ui.components.ui.ItemActionMenu
-import me.rerere.rikkahub.ui.components.ui.RikkaConfirmDialog
 import me.rerere.rikkahub.ui.components.ui.ShareSheet
 import me.rerere.rikkahub.ui.components.ui.SiliconFlowPowerByIcon
 import me.rerere.rikkahub.ui.components.ui.Tag
 import me.rerere.rikkahub.ui.components.ui.TagType
-import me.rerere.rikkahub.ui.components.ui.longPressReorder
 import me.rerere.rikkahub.ui.components.ui.rememberShareSheetState
 import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.context.LocalToaster
@@ -121,6 +120,9 @@ import me.rerere.rikkahub.ui.hooks.useEditState
 import me.rerere.rikkahub.ui.pages.assistant.detail.CustomBodies
 import me.rerere.rikkahub.ui.pages.assistant.detail.CustomHeaders
 import me.rerere.rikkahub.ui.pages.setting.components.ProviderConfigure
+import me.rerere.rikkahub.ui.pages.setting.components.CodexProviderConfigure
+import me.rerere.rikkahub.ui.pages.setting.components.GeminiProviderConfigure
+import me.rerere.rikkahub.ui.pages.setting.components.GrokProviderConfigure
 import me.rerere.rikkahub.ui.pages.setting.components.ProviderConnectionTester
 import me.rerere.rikkahub.ui.pages.setting.components.SettingProviderBalanceOption
 import me.rerere.rikkahub.ui.pages.setting.components.isUsingDefaultBaseUrl
@@ -183,14 +185,20 @@ fun SettingProviderDetailPage(id: Uuid, vm: SettingVM = koinViewModel()) {
                     }
                 },
                 actions = {
-                    val shareSheetState = rememberShareSheetState()
-                    ShareSheet(shareSheetState)
-                    IconButton(
-                        onClick = {
-                            shareSheetState.show(provider)
-                        }
+                    if (
+                        provider !is ProviderSetting.Codex &&
+                        provider !is ProviderSetting.Grok &&
+                        provider !is ProviderSetting.GeminiOAuth
                     ) {
-                        Icon(HugeIcons.Share01, null)
+                        val shareSheetState = rememberShareSheetState()
+                        ShareSheet(shareSheetState)
+                        IconButton(
+                            onClick = {
+                                shareSheetState.show(provider)
+                            }
+                        ) {
+                            Icon(HugeIcons.Share01, null)
+                        }
                     }
                 }
             )
@@ -262,6 +270,27 @@ private fun SettingProviderConfigPage(
     onEdit: (ProviderSetting) -> Unit,
     onDelete: () -> Unit
 ) {
+    if (provider is ProviderSetting.Codex) {
+        CodexProviderConfigure(
+            provider = provider,
+            onEdit = onEdit,
+        )
+        return
+    }
+    if (provider is ProviderSetting.Grok) {
+        GrokProviderConfigure(
+            provider = provider,
+            onEdit = onEdit,
+        )
+        return
+    }
+    if (provider is ProviderSetting.GeminiOAuth) {
+        GeminiProviderConfigure(
+            provider = provider,
+            onEdit = onEdit,
+        )
+        return
+    }
     var internalProvider by remember(provider) { mutableStateOf(provider) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -277,15 +306,6 @@ private fun SettingProviderConfigPage(
             provider = internalProvider,
             onEdit = {
                 internalProvider = it
-                // OAuth enablement is a runtime switch rather than a text-form field. Persist it
-                // immediately so leaving the provider page does not silently revert the toggle.
-                if (
-                    it is ProviderSetting.Codex ||
-                    it is ProviderSetting.Grok ||
-                    it is ProviderSetting.GeminiOAuth
-                ) {
-                    onEdit(it.copyProvider(name = it.name.trim()))
-                }
             }
         )
 
@@ -398,28 +418,25 @@ private fun ModelList(
 ) {
     val providerManager = koinInject<ProviderManager>()
     val toaster = LocalToaster.current
-    val modelState by produceState<Pair<List<Model>, String?>>(emptyList<Model>() to null, providerSetting) {
-        value = try {
-            println("loading models...")
-            providerManager.getProviderByType(providerSetting)
+    val modelList by produceState(emptyList(), providerSetting) {
+        runCatching {
+            value = providerManager.getProviderByType(providerSetting)
                 .listModels(providerSetting)
                 .sortedBy { it.modelId }
-                .toList() to null
-        } catch (error: Throwable) {
+                .toList()
+        }.onFailure { error ->
+            // runCatching catches Throwable, which includes CancellationException
+            // (e.g. when the user navigates away from the Models tab mid-fetch
+            // and Compose cancels this produceState's coroutine). Re-throw so
+            // we don't print a stack trace + show a toast for normal teardown.
+            if (error is kotlinx.coroutines.CancellationException) throw error
             error.printStackTrace()
-            val message = if (providerSetting is ProviderSetting.Grok && error.message?.contains("403") == true) {
-                "Grok models are unavailable: this account has no active SuperGrok/X Premium+ subscription or xAI credits."
-            } else {
-                error.message ?: "Failed to load models"
-            }
-            emptyList<Model>() to message
-        }
-    }
-    val modelList = modelState.first
-    val modelLoadError = modelState.second
-    LaunchedEffect(modelLoadError) {
-        modelLoadError?.let { message ->
-            toaster.show(message = message, type = ToastType.Error)
+            // Surface real failures (missing/invalid API key, providers like
+            // Minimax that return an HTTP 200 error envelope instead of a 4xx).
+            toaster.show(
+                error.message ?: "Failed to load models",
+                type = ToastType.Error
+            )
         }
     }
     var expanded by rememberSaveable { mutableStateOf(true) }
@@ -479,7 +496,17 @@ private fun ModelList(
                                 onUpdateProvider(providerSetting.editModel(editedModel))
                             },
                             parentProvider = providerSetting,
-                            modifier = longPressReorder(isDragging),
+                            modifier = Modifier
+                                .longPressDraggableHandle()
+                                .graphicsLayer {
+                                    if (isDragging) {
+                                        scaleX = 1.05f
+                                        scaleY = 1.05f
+                                    } else {
+                                        scaleX = 1f
+                                        scaleY = 1f
+                                    }
+                                },
                         )
                     }
                 }
@@ -712,16 +739,7 @@ private fun AddModelButton(
             models = models,
             selectedModels = selectedModels,
             onModelSelected = { model ->
-                val inputModalities = ModelRegistry.MODEL_INPUT_MODALITIES.getData(model.modelId)
-                val outputModalities = ModelRegistry.MODEL_OUTPUT_MODALITIES.getData(model.modelId)
-                val abilities = ModelRegistry.MODEL_ABILITIES.getData(model.modelId)
-                onAddModel(
-                    model.copy(
-                        inputModalities = inputModalities,
-                        outputModalities = outputModalities,
-                        abilities = abilities
-                    )
-                )
+                onAddModel(model.enrichCapabilities())
             },
             onModelDeselected = { model ->
                 onRemoveModel(model)
@@ -731,13 +749,7 @@ private fun AddModelButton(
                     parentProvider.copyProvider(
                         models = parentProvider.models + it.filter { model ->
                             parentProvider.models.none { existing -> existing.modelId == model.modelId }
-                        }.map { model ->
-                            model.copy(
-                                inputModalities = ModelRegistry.MODEL_INPUT_MODALITIES.getData(model.modelId),
-                                outputModalities = ModelRegistry.MODEL_OUTPUT_MODALITIES.getData(model.modelId),
-                                abilities = ModelRegistry.MODEL_ABILITIES.getData(model.modelId)
-                            )
-                        }
+                        }.map { model -> model.enrichCapabilities() }
                     )
                 )
             },
@@ -929,7 +941,7 @@ private fun ModelPicker(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(8.dp),
                 ) {
-                    items(filteredModels) {
+                    items(filteredModels, key = { it.id }) {
                         Card {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -959,13 +971,7 @@ private fun ModelPicker(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(2.dp)
                                     ) {
-                                        val modelMeta = remember(it) {
-                                            it.copy(
-                                                inputModalities = ModelRegistry.MODEL_INPUT_MODALITIES.getData(it.modelId),
-                                                outputModalities = ModelRegistry.MODEL_OUTPUT_MODALITIES.getData(it.modelId),
-                                                abilities = ModelRegistry.MODEL_ABILITIES.getData(it.modelId),
-                                            )
-                                        }
+                                        val modelMeta = remember(it) { it.enrichCapabilities() }
                                         ModelModalityTag(
                                             model = modelMeta,
                                         )
@@ -986,9 +992,9 @@ private fun ModelPicker(
                                     }
                                 ) {
                                     if (selectedModels.any { model -> model.modelId == it.modelId }) {
-                                        Icon(HugeIcons.Cancel01, null)
+                                        Icon(HugeIcons.Cancel01, stringResource(R.string.delete))
                                     } else {
-                                        Icon(HugeIcons.Add01, null)
+                                        Icon(HugeIcons.Add01, stringResource(R.string.add))
                                     }
                                 }
                             }
@@ -1023,7 +1029,7 @@ private fun ModelPicker(
                 showModal = true
             }
         ) {
-            Icon(HugeIcons.Package01, null)
+            Icon(HugeIcons.Package01, stringResource(R.string.setting_model_page_title))
         }
     }
 }
@@ -1183,8 +1189,8 @@ private fun ModelCard(
     val dialogState = useEditState<Model> {
         onEdit(it.copy(displayName = it.displayName.trim()))
     }
+    val swipeToDismissBoxState = rememberSwipeToDismissBoxState()
     val scope = rememberCoroutineScope()
-    var showDeleteDialog by remember { mutableStateOf(false) }
 
 
     if (dialogState.isEditing) {
@@ -1266,79 +1272,99 @@ private fun ModelCard(
         }
     }
 
-    OutlinedCard(
-        onClick = { dialogState.open(model.copy()) },
-        modifier = modifier,
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                shape = MaterialTheme.shapes.small,
+    SwipeToDismissBox(
+        state = swipeToDismissBoxState,
+        backgroundContent = {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                AutoAIIcon(
-                    name = model.modelId,
-                    modifier = Modifier.size(36.dp),
-                )
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    text = model.displayName,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    if (model.providerOverwrite != null) {
-                        Tag(type = TagType.INFO) {
-                            Text(
-                                model.providerOverwrite?.javaClass?.simpleName ?: model.providerOverwrite?.name
-                                ?: "ProviderOverwrite"
-                            )
+                IconButton(
+                    onClick = {
+                        scope.launch {
+                            swipeToDismissBoxState.reset()
                         }
                     }
-                    ModelTypeTag(model = model)
-                    ModelModalityTag(model = model)
-                    ModelAbilityTag(model = model)
+                ) {
+                    Icon(HugeIcons.Cancel01, null)
+                }
+                FilledIconButton(
+                    onClick = {
+                        scope.launch {
+                            onDelete()
+                            swipeToDismissBoxState.reset()
+                        }
+                    }
+                ) {
+                    Icon(
+                        HugeIcons.Delete01,
+                        contentDescription = stringResource(R.string.chat_page_delete)
+                    )
                 }
             }
-
-            ItemActionMenu(
-                actions = listOf(
-                    ItemAction(
-                        text = stringResource(R.string.delete),
-                        icon = HugeIcons.Delete01,
-                        destructive = true,
-                        onClick = { showDeleteDialog = true },
-                    ),
-                )
-            )
-        }
-    }
-
-    RikkaConfirmDialog(
-        show = showDeleteDialog,
-        title = stringResource(R.string.confirm_delete),
-        confirmText = stringResource(R.string.delete),
-        dismissText = stringResource(R.string.cancel),
-        onConfirm = {
-            showDeleteDialog = false
-            onDelete()
         },
-        onDismiss = { showDeleteDialog = false },
+        enableDismissFromStartToEnd = false,
+        gesturesEnabled = true,
+        modifier = modifier
     ) {
-        Text(stringResource(R.string.common_delete_confirm_message, model.displayName))
+        OutlinedCard {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = MaterialTheme.shapes.small,
+                ) {
+                    AutoAIIcon(
+                        name = model.modelId,
+                        modifier = Modifier.size(36.dp),
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = model.displayName,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        if (model.providerOverwrite != null) {
+                            Tag(type = TagType.INFO) {
+                                Text(
+                                    model.providerOverwrite?.javaClass?.simpleName ?: model.providerOverwrite?.name
+                                    ?: "ProviderOverwrite"
+                                )
+                            }
+                        }
+                        ModelTypeTag(model = model)
+                        ModelModalityTag(model = model)
+                        ModelAbilityTag(model = model)
+                    }
+                }
+
+                // Edit button
+                IconButton(
+                    onClick = {
+                        dialogState.open(model.copy())
+                    }
+                ) {
+                    Icon(HugeIcons.Tools, stringResource(R.string.accessibility_edit_model))
+                }
+            }
+        }
     }
 }
 
@@ -1474,14 +1500,14 @@ private fun ProviderOverrideSettings(
                                 showProviderConfig = true
                             }
                         ) {
-                            Icon(HugeIcons.Tools, contentDescription = "Edit override")
+                            Icon(HugeIcons.Tools, contentDescription = stringResource(R.string.accessibility_edit_override))
                         }
                         IconButton(
                             onClick = {
                                 onUpdateProviderOverride(null)
                             }
                         ) {
-                            Icon(HugeIcons.Cancel01, contentDescription = "Remove override")
+                            Icon(HugeIcons.Cancel01, contentDescription = stringResource(R.string.accessibility_remove_override))
                         }
                     }
                 }
@@ -1506,7 +1532,8 @@ private fun ProviderOverrideSettings(
         }
 
         // Provider configuration modal
-        if (showProviderConfig && editingProvider != null) {
+        val currentEditingProvider = editingProvider
+        if (showProviderConfig && currentEditingProvider != null) {
             ModalBottomSheet(
                 onDismissRequest = {
                     showProviderConfig = false
@@ -1514,7 +1541,7 @@ private fun ProviderOverrideSettings(
                 },
                 sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
             ) {
-                var internalProvider by remember(editingProvider) { mutableStateOf(editingProvider!!) }
+                var internalProvider by remember(currentEditingProvider) { mutableStateOf(currentEditingProvider) }
 
                 Column(
                     modifier = Modifier
@@ -1567,3 +1594,20 @@ private fun ProviderOverrideSettings(
         }
     }
 }
+
+/**
+ * Prefer capabilities auto-detected at fetch time (OpenRouter's /models populates
+ * supportedParameters, modalities, abilities and the IMAGE model type); only fall back to
+ * the static ModelRegistry lookup for providers that return bare model ids. Without this,
+ * the registry lookup clobbered OpenRouter's detected image/tool/reasoning capabilities.
+ */
+private fun Model.enrichCapabilities(): Model =
+    if (supportedParameters.isNotEmpty()) {
+        this
+    } else {
+        copy(
+            inputModalities = ModelRegistry.MODEL_INPUT_MODALITIES.getData(modelId),
+            outputModalities = ModelRegistry.MODEL_OUTPUT_MODALITIES.getData(modelId),
+            abilities = ModelRegistry.MODEL_ABILITIES.getData(modelId),
+        )
+    }

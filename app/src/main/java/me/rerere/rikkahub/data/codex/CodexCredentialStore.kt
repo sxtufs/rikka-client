@@ -29,7 +29,9 @@ internal class CodexCredentialStore(
             val cipher = Cipher.getInstance(TRANSFORMATION)
             cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(TAG_LENGTH, iv))
             json.decodeFromString<CodexAccountState>(cipher.doFinal(encrypted).decodeToString())
-        }.getOrElse { CodexAccountState() }
+        }.getOrElse {
+            CodexAccountState()
+        }
     }
 
     fun write(state: CodexAccountState) {

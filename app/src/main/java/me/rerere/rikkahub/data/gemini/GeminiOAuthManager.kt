@@ -1,148 +1,88 @@
 package me.rerere.rikkahub.data.gemini
 
 import android.content.Context
-import kotlinx.coroutines.CancellationException
-import me.rerere.rikkahub.AppScope
-import kotlinx.coroutines.Job
+import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.Uri
+import android.os.Build
+import android.util.Log
+import io.ktor.http.ContentType
+import io.ktor.server.application.call
+import io.ktor.server.cio.CIO
+import io.ktor.server.cio.CIOApplicationEngine
+import io.ktor.server.engine.EmbeddedServer
+import io.ktor.server.engine.embeddedServer
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.routing
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import me.rerere.oauth.BrowserOAuthAuthorizationLauncher
-import me.rerere.oauth.OAuthAuthorizationLauncher
-import me.rerere.oauth.OAuthHttpClient
-import me.rerere.oauth.OAuthHttpClient.AuthorizationCodeTokenRequest
-import me.rerere.oauth.OAuthHttpClient.AuthorizationRequest
-import me.rerere.oauth.OAuthLoopbackCallbackServer
+import kotlinx.coroutines.suspendCancellableCoroutine
+import me.rerere.common.http.await
+import me.rerere.rikkahub.R
+import okhttp3.FormBody
 import okhttp3.OkHttpClient
-import kotlin.time.Duration.Companion.minutes
+import okhttp3.Request
+import java.net.URLEncoder
+import java.security.SecureRandom
+import java.util.Base64
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.resume
 
 /**
- * Loopback OAuth against Google's installed-app client (Antigravity).
+ * Loopback OAuth against Google's installed-app client, the same one Antigravity ships.
  *
- * Google issues that client as a desktop app rather than a public one, so:
- * 1. The token exchange includes a client_secret (not just pkce_verifier)
- * 2. access_type=offline + prompt=consent are needed to get refresh tokens
- * 3. The redirect URI must use one of Google's registered loopback ports
+ * Google issues that client as a desktop app rather than a public one, so the token exchange is
+ * authenticated with a client secret and there is no PKCE leg. `access_type=offline` plus
+ * `prompt=consent` are what make Google return a refresh token at all.
  */
 class GeminiOAuthManager(
     private val context: Context,
-    private val scope: AppScope,
+    private val scope: CoroutineScope,
     private val client: OkHttpClient,
     private val repository: GeminiAccountRepository,
-    private val authorizationLauncher: OAuthAuthorizationLauncher = BrowserOAuthAuthorizationLauncher,
 ) {
+    private var server: EmbeddedServer<CIOApplicationEngine, CIOApplicationEngine.Configuration>? = null
+    private var callbackPort: Int? = null
+    private val sessions = ConcurrentHashMap<String, String>()
     private val _status = MutableStateFlow<GeminiOAuthStatus>(GeminiOAuthStatus.Idle)
     val status: StateFlow<GeminiOAuthStatus> = _status.asStateFlow()
-    private var loginJob: Job? = null
 
     fun startLogin() {
-        loginJob?.cancel()
-        loginJob = scope.launch {
-            val oauth = OAuthHttpClient(client)
-            val state = oauth.generateState()
-            val pkce = oauth.generatePkce()
-            var server: OAuthLoopbackCallbackServer? = null
-            var session: me.rerere.oauth.OAuthLoopbackCallbackSession? = null
-            try {
-                // Prefer Antigravity's usual loopback port, but fall back to an ephemeral
-                // loopback port if a stale process or another local client already owns it.
-                // Google installed-app clients accept loopback redirects with a varying port.
-                var callbackError: Throwable? = null
-                for (port in CALLBACK_PORTS) {
-                    val candidate = OAuthLoopbackCallbackServer(
-                        port = port,
-                        callbackPath = CALLBACK_PATH,
-                        redirectHost = "localhost",
-                    )
-                    try {
-                        val candidateSession = candidate.openSession(state)
-                        server = candidate
-                        session = candidateSession
-                        break
-                    } catch (error: Throwable) {
-                        callbackError = error
-                        runCatching { candidate.close() }
-                    }
+        val state = randomUrlSafe(32)
+        try {
+            val port = ensureCallbackServer()
+            val redirect = "http://localhost:$port$CALLBACK_PATH"
+            sessions[state] = redirect
+            _status.value = GeminiOAuthStatus.Waiting
+
+            val authUrl = Uri.parse(AUTHORIZE_URL).buildUpon()
+                .appendQueryParameter("response_type", "code")
+                .appendQueryParameter("client_id", CLIENT_ID)
+                .appendQueryParameter("redirect_uri", redirect)
+                .appendQueryParameter("scope", SCOPES)
+                .appendQueryParameter("state", state)
+                .appendQueryParameter("access_type", "offline")
+                .appendQueryParameter("prompt", "consent")
+                .build()
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, authUrl).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                val activeSession = session ?: throw IllegalStateException(
-                    "Unable to start the Google OAuth callback server",
-                    callbackError,
-                )
-                val redirectUri = activeSession.redirectUri
-
-                val url = oauth.buildAuthorizationUrl(
-                    AuthorizationRequest(
-                        authorizationEndpoint = AUTHORIZE_URL,
-                        clientId = CLIENT_ID,
-                        redirectUri = redirectUri,
-                        pkce = pkce,
-                        state = state,
-                        scope = SCOPES,
-                        additionalParameters = mapOf(
-                            "access_type" to "offline",
-                            "prompt" to "consent",
-                            "include_granted_scopes" to "true",
-                        ),
-                    )
-                )
-                _status.value = GeminiOAuthStatus.Waiting
-                authorizationLauncher.launch(context, url)
-
-                val callback = activeSession.awaitCallback(10.minutes)
-                    ?: error("Google sign-in timed out")
-                if (callback.state != state) error("OAuth state mismatch")
-                if (!callback.error.isNullOrBlank()) {
-                    error(callback.errorDescription ?: callback.error ?: "Google authorization failed")
+            )
+        } catch (error: Throwable) {
+            sessions.remove(state)
+            _status.value = GeminiOAuthStatus.Error(
+                if (error.message == CALLBACK_PORTS_UNAVAILABLE) {
+                    context.getString(R.string.gemini_oauth_ports_unavailable)
+                } else {
+                    error.message ?: "Unable to open the Google sign-in page"
                 }
-                val code = callback.code ?: error("Missing authorization code")
-
-                val token = oauth.exchangeAuthorizationCode(
-                    AuthorizationCodeTokenRequest(
-                        tokenEndpoint = TOKEN_URL,
-                        clientId = CLIENT_ID,
-                        clientSecret = CLIENT_SECRET,
-                        code = code,
-                        codeVerifier = pkce.verifier,
-                        redirectUri = redirectUri,
-                    )
-                )
-
-                val tokenJson = buildJsonObject {
-                    put("access_token", token.accessToken)
-                    token.refreshToken?.let { put("refresh_token", it) }
-                    token.expiresIn?.let { put("expires_in", it) }
-                    put("token_type", token.tokenType)
-                }
-                val account = repository.saveLogin(tokenJson.toString())
-                _status.value = GeminiOAuthStatus.Success(account.id)
-                runCatching { repository.refreshAccount(account.id) }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Throwable) {
-                _status.value = GeminiOAuthStatus.Error(error.message ?: "Gemini sign-in failed")
-            } finally {
-                session?.close()
-                server?.close()
-                server = null
-            }
-        }
-    }
-
-    fun cancel() {
-        loginJob?.cancel()
-        loginJob = null
-        _status.value = GeminiOAuthStatus.Idle
-    }
-
-    fun logout() {
-        loginJob?.cancel()
-        loginJob = null
-        scope.launch {
-            repository.accounts.value.toList().forEach { repository.delete(it.id) }
-            _status.value = GeminiOAuthStatus.Idle
+            )
         }
     }
 
@@ -150,7 +90,145 @@ class GeminiOAuthManager(
         _status.value = GeminiOAuthStatus.Idle
     }
 
+    @Synchronized
+    private fun ensureCallbackServer(): Int {
+        callbackPort?.let { return it }
+        var lastError: Throwable? = null
+        for (port in CALLBACK_PORTS) {
+            try {
+                server = embeddedServer(CIO, host = "127.0.0.1", port = port) {
+                    routing {
+                        get(CALLBACK_PATH) {
+                            val callbackState = call.request.queryParameters["state"]
+                            val code = call.request.queryParameters["code"]
+                            val error = call.request.queryParameters["error"]
+                            val redirectUri = callbackState?.let(sessions::remove)
+                            when {
+                                redirectUri == null -> {
+                                    _status.value = GeminiOAuthStatus.Error("OAuth state mismatch")
+                                    call.respondText(callbackPage(false), ContentType.Text.Html)
+                                }
+
+                                !error.isNullOrBlank() -> {
+                                    _status.value = GeminiOAuthStatus.Error(error)
+                                    call.respondText(callbackPage(false), ContentType.Text.Html)
+                                }
+
+                                code.isNullOrBlank() -> {
+                                    _status.value =
+                                        GeminiOAuthStatus.Error("Missing authorization code")
+                                    call.respondText(callbackPage(false), ContentType.Text.Html)
+                                }
+
+                                else -> {
+                                    call.respondText(callbackPage(true), ContentType.Text.Html)
+                                    scope.launch {
+                                        try {
+                                            awaitNetworkUnblocked()
+                                            val account = exchangeCode(code, redirectUri)
+                                            _status.value = GeminiOAuthStatus.Success(account.id)
+                                        } catch (error: Throwable) {
+                                            Log.e(
+                                                TAG,
+                                                "OAuth token exchange failed: " +
+                                                    "${error::class.java.name}: ${error.message}",
+                                                error,
+                                            )
+                                            _status.value = GeminiOAuthStatus.Error(
+                                                error.message ?: "OAuth token exchange failed"
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }.start(wait = false)
+                callbackPort = port
+                return port
+            } catch (error: Throwable) {
+                lastError = error
+            }
+        }
+        throw IllegalStateException(CALLBACK_PORTS_UNAVAILABLE, lastError)
+    }
+
+    private suspend fun awaitNetworkUnblocked() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        val connectivityManager = context.getSystemService(ConnectivityManager::class.java)
+        suspendCancellableCoroutine { continuation ->
+            lateinit var callback: ConnectivityManager.NetworkCallback
+            callback = object : ConnectivityManager.NetworkCallback() {
+                override fun onBlockedStatusChanged(network: Network, blocked: Boolean) {
+                    if (!blocked && continuation.isActive) {
+                        runCatching { connectivityManager.unregisterNetworkCallback(callback) }
+                        continuation.resume(Unit)
+                    }
+                }
+            }
+            continuation.invokeOnCancellation {
+                runCatching { connectivityManager.unregisterNetworkCallback(callback) }
+            }
+            connectivityManager.registerDefaultNetworkCallback(callback)
+        }
+    }
+
+    private suspend fun exchangeCode(code: String, redirectUri: String): GeminiAccount {
+        val response = client.newCall(
+            Request.Builder()
+                .url(TOKEN_URL)
+                .post(
+                    FormBody.Builder()
+                        .add("client_id", CLIENT_ID)
+                        .add("client_secret", CLIENT_SECRET)
+                        .add("code", code)
+                        .add("grant_type", "authorization_code")
+                        .add("redirect_uri", redirectUri)
+                        .build()
+                )
+                .build()
+        ).await()
+        val body = response.body.string()
+        if (!response.isSuccessful) {
+            error("Token exchange failed: ${response.code}")
+        }
+        return repository.saveLogin(body)
+    }
+
+    private fun callbackPage(success: Boolean): String {
+        val status = if (success) "success" else "error"
+        val deepLink = "rikkahub://gemini/oauth?status=${URLEncoder.encode(status, Charsets.UTF_8.name())}"
+        return """
+            <!doctype html>
+            <html>
+              <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <meta http-equiv="refresh" content="0; url=$deepLink">
+                <title>RikkaHub Gemini OAuth</title>
+              </head>
+              <body>
+                <p>${if (success) "Returning to RikkaHub..." else "Sign-in failed."}</p>
+                <p><a href="$deepLink">Return to RikkaHub</a></p>
+                <script>
+                  window.location.replace("$deepLink");
+                  setTimeout(function () { window.location.href = "$deepLink"; }, 500);
+                </script>
+              </body>
+            </html>
+        """.trimIndent()
+    }
+
+    private fun randomUrlSafe(size: Int): String {
+        val bytes = ByteArray(size)
+        SecureRandom().nextBytes(bytes)
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+    }
+
     companion object {
+        private const val TAG = "GeminiOAuthManager"
+        private const val CALLBACK_PORTS_UNAVAILABLE = "OAuth callback ports are unavailable"
+
         // Google's published Antigravity installed-app credentials, in plaintext on purpose.
         // An installed-app OAuth client cannot hold a confidential secret: every copy of
         // Antigravity ships these and they are recoverable from any install, which is why Google
@@ -159,20 +237,21 @@ class GeminiOAuthManager(
         const val CLIENT_ID =
             "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
         const val CLIENT_SECRET = "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"
-        const val AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
         const val TOKEN_URL = "https://oauth2.googleapis.com/token"
+        const val AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 
         // cclog and experimentsandconfigs are Antigravity-specific and are part of what the
         // consent screen is registered for, so the grant is rejected without them.
-        const val SCOPES = "openid " +
-            "https://www.googleapis.com/auth/cloud-platform " +
+        const val SCOPES = "https://www.googleapis.com/auth/cloud-platform " +
             "https://www.googleapis.com/auth/userinfo.email " +
             "https://www.googleapis.com/auth/userinfo.profile " +
             "https://www.googleapis.com/auth/cclog " +
             "https://www.googleapis.com/auth/experimentsandconfigs"
-
-        private val CALLBACK_PORTS = listOf(51121, 0)
         private const val CALLBACK_PATH = "/oauth-callback"
+
+        // Antigravity registers a single fixed loopback port with the OAuth client, so unlike a
+        // free-choice port there is nothing to fall back to if it is taken.
+        private val CALLBACK_PORTS = listOf(51121)
     }
 }
 
