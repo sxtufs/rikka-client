@@ -90,9 +90,6 @@ class GeminiAccountRepository internal constructor(
         error("No available Gemini account")
     }
 
-    suspend fun setEnabled        error("No available Gemini account")
-    }
-
     /** Resolve the project for accounts saved before projectId was persisted. */
     suspend fun ensureProject(account: GeminiAccount): GeminiAccount = mutex.withLock {
         if (!account.projectId.isNullOrBlank()) return@withLock account
