@@ -111,7 +111,15 @@ private fun CodexOAuthConfigure(
                 },
                 onRefresh = { scope.launch { repository.refreshAccount(account.id) } },
                 onReauth = manager::startLogin,
-                onDelete = { scope.launch { repository.delete(account.id) } },
+                onDelete = {
+                    scope.launch {
+                        repository.delete(account.id)
+                        val remaining = accounts.filterNot { it.id == account.id }
+                        if (remaining.none { it.enabled && it.tokenStatus != CodexTokenStatus.INVALID }) {
+                            onEdit(provider.copyProvider(enabled = false, models = emptyList()))
+                        }
+                    }
+                },
             )
         }
     }
@@ -161,7 +169,15 @@ private fun GrokOAuthConfigure(
                 },
                 onRefresh = { scope.launch { repository.refreshAccount(account.id) } },
                 onReauth = manager::startLogin,
-                onDelete = { scope.launch { repository.delete(account.id) } },
+                onDelete = {
+                    scope.launch {
+                        repository.delete(account.id)
+                        val remaining = accounts.filterNot { it.id == account.id }
+                        if (remaining.none { it.enabled && it.tokenStatus != GrokTokenStatus.INVALID }) {
+                            onEdit(provider.copyProvider(enabled = false, models = emptyList()))
+                        }
+                    }
+                },
             )
         }
     }
@@ -229,7 +245,15 @@ private fun GeminiOAuthConfigure(
                 },
                 onRefresh = { scope.launch { repository.refreshAccount(account.id) } },
                 onReauth = manager::startLogin,
-                onDelete = { scope.launch { repository.delete(account.id) } },
+                onDelete = {
+                    scope.launch {
+                        repository.delete(account.id)
+                        val remaining = accounts.filterNot { it.id == account.id }
+                        if (remaining.none { it.enabled && it.tokenStatus != GeminiTokenStatus.INVALID }) {
+                            onEdit(provider.copyProvider(enabled = false, models = emptyList()))
+                        }
+                    }
+                },
             )
         }
     }
