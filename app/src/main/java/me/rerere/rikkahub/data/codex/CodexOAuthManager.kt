@@ -211,7 +211,7 @@ class CodexOAuthManager(
 
     private fun callbackPage(success: Boolean): String {
         val status = if (success) "success" else "error"
-        val deepLink = "rikkahub://codex/oauth?status=${URLEncoder.encode(status, Charsets.UTF_8.name())}"
+        val deepLink = "rikkahub-client://codex/oauth?status=${URLEncoder.encode(status, Charsets.UTF_8.name())}"
         return """
             <!doctype html>
             <html>

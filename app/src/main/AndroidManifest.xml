@@ -127,7 +127,7 @@
         <action android:name="android.intent.action.VIEW" />
         <category android:name="android.intent.category.DEFAULT" />
         <category android:name="android.intent.category.BROWSABLE" />
-        <data android:host="codex" android:path="/oauth" android:scheme="rikkahub" />
+        <data android:host="codex" android:path="/oauth" android:scheme="rikkahub-client" />
       </intent-filter>
     </activity>
     <activity
@@ -138,7 +138,7 @@
         <action android:name="android.intent.action.VIEW" />
         <category android:name="android.intent.category.DEFAULT" />
         <category android:name="android.intent.category.BROWSABLE" />
-        <data android:host="gemini" android:path="/oauth" android:scheme="rikkahub" />
+        <data android:host="gemini" android:path="/oauth" android:scheme="rikkahub-client" />
       </intent-filter>
     </activity>
     <activity
