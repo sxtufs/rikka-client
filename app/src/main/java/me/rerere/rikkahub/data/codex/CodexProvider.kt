@@ -4,6 +4,7 @@ import android.os.Build
 import me.rerere.rikkahub.AppScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -31,6 +32,7 @@ import me.rerere.ai.provider.TextGenerationResult
 import me.rerere.ai.provider.providers.openai.ResponseAPI
 import me.rerere.ai.ui.ImageGenerationItem
 import me.rerere.ai.ui.StreamChunk
+import me.rerere.ai.ui.StreamChunkHandler
 import me.rerere.ai.ui.UIMessage
 import me.rerere.common.http.await
 import okhttp3.MediaType.Companion.toMediaType
@@ -92,11 +94,20 @@ class CodexProvider(
         messages: List<UIMessage>,
         params: TextGenerationParams,
     ): TextGenerationResult {
-        val account = repository.acquireAccount()
-        return responseApiFor(account).generateText(
-            syntheticSetting(providerSetting, account),
-            withDefaultInstructions(messages),
-            withCodexParams(params, account, stream = false),
+        // The Codex backend requires stream=true even for callers requesting a complete result.
+        // Consume the stream here so connection tests, tool calls and non-stream app flows all
+        // use the same working transport.
+        var collected = listOf(UIMessage(role = MessageRole.ASSISTANT, parts = emptyList()))
+        val handler = StreamChunkHandler(params.model)
+        streamText(providerSetting, messages, params).collect { chunk ->
+            collected = handler.handle(collected, chunk)
+        }
+        val message = collected.last()
+        return TextGenerationResult(
+            id = "",
+            model = params.model.modelId,
+            message = message,
+            usage = message.usage,
         )
     }
 

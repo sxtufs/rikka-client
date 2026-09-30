@@ -67,6 +67,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -396,15 +397,29 @@ private fun ModelList(
     onUpdateProvider: (ProviderSetting) -> Unit
 ) {
     val providerManager = koinInject<ProviderManager>()
-    val modelList by produceState(emptyList(), providerSetting) {
-        runCatching {
+    val toaster = LocalToaster.current
+    val modelState by produceState<Pair<List<Model>, String?>>(emptyList<Model>() to null, providerSetting) {
+        value = try {
             println("loading models...")
-            value = providerManager.getProviderByType(providerSetting)
+            providerManager.getProviderByType(providerSetting)
                 .listModels(providerSetting)
                 .sortedBy { it.modelId }
-                .toList()
-        }.onFailure {
-            it.printStackTrace()
+                .toList() to null
+        } catch (error: Throwable) {
+            error.printStackTrace()
+            val message = if (providerSetting is ProviderSetting.Grok && error.message?.contains("403") == true) {
+                "Grok models are unavailable: this account has no active SuperGrok/X Premium+ subscription or xAI credits."
+            } else {
+                error.message ?: "Failed to load models"
+            }
+            emptyList<Model>() to message
+        }
+    }
+    val modelList = modelState.first
+    val modelLoadError = modelState.second
+    LaunchedEffect(modelLoadError) {
+        modelLoadError?.let { message ->
+            toaster.show(message = message, type = ToastType.Error)
         }
     }
     var expanded by rememberSaveable { mutableStateOf(true) }

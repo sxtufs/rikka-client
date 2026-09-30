@@ -337,8 +337,14 @@ private fun GrokAccountCard(
         onReauth = onReauth,
         onDelete = onDelete,
     ) {
+        account.usage?.planName?.let { plan ->
+            Text("Plan: $plan")
+        }
         account.usage?.weekly?.let {
             UsageWindow("Weekly limit", it.usedPercent, it.resetsAt)
+        }
+        account.usage?.let {
+            Text("Pay as you go: ${if (it.onDemandCap > 0.0) "enabled" else "disabled"}")
         }
     }
 }
