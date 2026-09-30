@@ -32,13 +32,6 @@ import androidx.compose.ui.unit.dp
 import com.dokar.sonner.ToastType
 import me.rerere.ai.provider.ClaudePromptCacheTtl
 import me.rerere.ai.provider.ProviderSetting
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import me.rerere.rikkahub.data.codex.CodexOAuthManager
-import me.rerere.rikkahub.data.codex.CodexOAuthStatus
-import me.rerere.rikkahub.data.gemini.GeminiOAuthManager
-import me.rerere.rikkahub.data.gemini.GeminiOAuthStatus
-import me.rerere.rikkahub.data.grok.GrokOAuthManager
-import me.rerere.rikkahub.data.grok.GrokOAuthStatus
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.DEFAULT_PROVIDERS
 import me.rerere.hugeicons.HugeIcons
@@ -52,7 +45,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.reflect.KClass
-import org.koin.compose.koinInject
 
 @Composable
 fun ProviderConfigure(
@@ -234,105 +226,7 @@ private fun ProviderConfigureOAuth(
     provider: ProviderSetting,
     onEdit: (ProviderSetting) -> Unit,
 ) {
-    provider.description()
-
-    OutlinedTextField(
-        value = provider.name,
-        onValueChange = { onEdit(provider.copyProvider(name = it)) },
-        label = { Text(stringResource(R.string.setting_provider_page_name)) },
-        modifier = Modifier.fillMaxWidth(),
-    )
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(stringResource(R.string.setting_provider_page_enable))
-        Switch(
-            checked = provider.enabled,
-            onCheckedChange = { onEdit(provider.copyProvider(enabled = it)) },
-        )
-    }
-
-    when (provider) {
-        is ProviderSetting.Codex -> {
-            val manager: CodexOAuthManager = koinInject()
-            val status by manager.status.collectAsStateWithLifecycle()
-            Button(onClick = manager::startLogin, modifier = Modifier.fillMaxWidth()) {
-                Text("Sign in with OpenAI")
-            }
-            OutlinedButton(
-                onClick = {
-                    manager.logout()
-                    onEdit(provider.copyProvider(enabled = false, models = emptyList()))
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Sign out all OpenAI accounts")
-            }
-            when (val currentStatus = status) {
-                CodexOAuthStatus.Idle -> Unit
-                CodexOAuthStatus.Waiting -> Text("Waiting for OpenAI authorization…")
-                is CodexOAuthStatus.Success -> Text("OpenAI account connected")
-                is CodexOAuthStatus.Error -> Text("OpenAI sign-in failed: ${currentStatus.message}")
-            }
-        }
-        is ProviderSetting.Grok -> {
-            val manager: GrokOAuthManager = koinInject()
-            val status by manager.status.collectAsStateWithLifecycle()
-            Button(onClick = manager::startLogin, modifier = Modifier.fillMaxWidth()) {
-                Text("Sign in with xAI")
-            }
-            OutlinedButton(
-                onClick = {
-                    manager.logout()
-                    onEdit(provider.copyProvider(enabled = false, models = emptyList()))
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Sign out all xAI accounts")
-            }
-            when (val currentStatus = status) {
-                GrokOAuthStatus.Idle -> Unit
-                GrokOAuthStatus.Starting -> Text("Starting xAI sign-in…")
-                is GrokOAuthStatus.AwaitingApproval -> Text("Approve xAI sign-in in your browser")
-                is GrokOAuthStatus.Success -> Text("xAI account connected")
-                is GrokOAuthStatus.Error -> Text("xAI sign-in failed: ${currentStatus.message}")
-            }
-        }
-        is ProviderSetting.GeminiOAuth -> {
-            Text(
-                "Gemini OAuth signs in with a Google account and talks to Google's Cloud Code " +
-                    "Assist (the Antigravity backend). This is not the official Gemini API; " +
-                    "Google may restrict or revoke access, so keep a standard API-key provider " +
-                    "configured as a fallback.",
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.labelSmall,
-            )
-            val manager: GeminiOAuthManager = koinInject()
-            val status by manager.status.collectAsStateWithLifecycle()
-            Button(onClick = manager::startLogin, modifier = Modifier.fillMaxWidth()) {
-                Text("Sign in with Google")
-            }
-            OutlinedButton(
-                onClick = {
-                    manager.logout()
-                    onEdit(provider.copyProvider(enabled = false, models = emptyList()))
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Sign out all Google accounts")
-            }
-            when (val currentStatus = status) {
-                GeminiOAuthStatus.Idle -> Unit
-                GeminiOAuthStatus.Waiting -> Text("Waiting for Google authorization…")
-                is GeminiOAuthStatus.Success -> Text("Google account connected")
-                is GeminiOAuthStatus.Error -> Text("Google sign-in failed: ${currentStatus.message}")
-            }
-        }
-        else -> Unit
-    }
+    OAuthProviderConfigureScreen(provider, onEdit)
 }
 
 @Composable
