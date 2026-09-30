@@ -270,27 +270,6 @@ private fun SettingProviderConfigPage(
     onEdit: (ProviderSetting) -> Unit,
     onDelete: () -> Unit
 ) {
-    if (provider is ProviderSetting.Codex) {
-        CodexProviderConfigure(
-            provider = provider,
-            onEdit = onEdit,
-        )
-        return
-    }
-    if (provider is ProviderSetting.Grok) {
-        GrokProviderConfigure(
-            provider = provider,
-            onEdit = onEdit,
-        )
-        return
-    }
-    if (provider is ProviderSetting.GeminiOAuth) {
-        GeminiProviderConfigure(
-            provider = provider,
-            onEdit = onEdit,
-        )
-        return
-    }
     var internalProvider by remember(provider) { mutableStateOf(provider) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -302,12 +281,24 @@ private fun SettingProviderConfigPage(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        ProviderConfigure(
-            provider = internalProvider,
-            onEdit = {
-                internalProvider = it
-            }
-        )
+        when (val currentProvider = internalProvider) {
+            is ProviderSetting.Codex -> CodexProviderConfigure(
+                provider = currentProvider,
+                onEdit = { internalProvider = it },
+            )
+            is ProviderSetting.Grok -> GrokProviderConfigure(
+                provider = currentProvider,
+                onEdit = { internalProvider = it },
+            )
+            is ProviderSetting.GeminiOAuth -> GeminiProviderConfigure(
+                provider = currentProvider,
+                onEdit = { internalProvider = it },
+            )
+            else -> ProviderConfigure(
+                provider = currentProvider,
+                onEdit = { internalProvider = it },
+            )
+        }
 
         if (internalProvider is ProviderSetting.OpenAI) {
             SettingProviderBalanceOption(

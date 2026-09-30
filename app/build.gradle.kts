@@ -151,8 +151,8 @@ composeCompiler {
 }
 
 tasks.register("buildAll") {
-    dependsOn("assembleRelease", "bundleRelease")
-    description = "Build both APK and AAB"
+    dependsOn("assembleRelease")
+    description = "Build the release APK"
 }
 
 ksp {

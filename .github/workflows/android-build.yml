@@ -1,4 +1,4 @@
-name: Android Build Check
+name: Android arm64 Release
 
 on:
   workflow_dispatch:
@@ -11,9 +11,9 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  build-arm64-release:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -31,14 +31,11 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          # The legacy `tools` package is no longer hosted by Google.
           packages: platform-tools
 
       - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses >/dev/null || true
-          # API 37 platform packages use minor-versioned IDs.
-          # The app requests compileSdk 37.2 in app/build.gradle.kts.
           sdkmanager "platform-tools" "platforms;android-37.2" "build-tools;37.0.0"
 
       - name: Set up pnpm
@@ -103,7 +100,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lint-reports-${{ github.sha }}
+          name: lint-reports
           path: |
             app/build/reports/lint-results-debug.html
             app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
@@ -111,13 +108,14 @@ jobs:
           retention-days: 14
 
       - name: Build unsigned arm64 release APK
-        run: ./gradlew assembleRelease --stacktrace -Parm64Only=true
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace -Parm64Only=true
 
-      - name: Upload unsigned release APK
+      - name: Upload unsigned arm64 release APK
         uses: actions/upload-artifact@v4
         with:
-          name: rikkahub-release-unsigned-${{ github.sha }}
-          # With arm64Only=true, the single APK has the standard app-release name.
+          name: rikkahub-release
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 14
