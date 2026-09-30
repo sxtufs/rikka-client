@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import me.rerere.oauth.CustomTabsOAuthAuthorizationLauncher
+import me.rerere.oauth.BrowserOAuthAuthorizationLauncher
 import me.rerere.oauth.OAuthAuthorizationLauncher
 import me.rerere.oauth.OAuthHttpClient
 import me.rerere.oauth.OAuthHttpClient.AuthorizationCodeTokenRequest
@@ -27,7 +27,7 @@ class CodexOAuthManager(
     private val scope: AppScope,
     private val client: OkHttpClient,
     private val repository: CodexAccountRepository,
-    private val authorizationLauncher: OAuthAuthorizationLauncher = CustomTabsOAuthAuthorizationLauncher,
+    private val authorizationLauncher: OAuthAuthorizationLauncher = BrowserOAuthAuthorizationLauncher,
 ) {
     private val _status = MutableStateFlow<CodexOAuthStatus>(CodexOAuthStatus.Idle)
     val status: StateFlow<CodexOAuthStatus> = _status.asStateFlow()
@@ -121,6 +121,7 @@ class CodexOAuthManager(
                 )
             } finally {
                 session?.close()
+                callbackServer?.close()
                 callbackServer = null
             }
         }

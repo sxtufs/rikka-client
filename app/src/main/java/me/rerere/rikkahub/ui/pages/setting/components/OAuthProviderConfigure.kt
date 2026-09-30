@@ -17,10 +17,12 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
@@ -49,14 +51,18 @@ internal fun OAuthProviderConfigureScreen(
     provider: ProviderSetting,
     onEdit: (ProviderSetting) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text(provider.name, style = MaterialTheme.typography.headlineSmall)
+    CompositionLocalProvider(
+        LocalTextStyle provides MaterialTheme.typography.bodyMedium,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Text(provider.name, style = MaterialTheme.typography.headlineSmall)
 
-        when (provider) {
-            is ProviderSetting.Codex -> CodexOAuthConfigure(provider, onEdit)
-            is ProviderSetting.Grok -> GrokOAuthConfigure(provider, onEdit)
-            is ProviderSetting.GeminiOAuth -> GeminiOAuthConfigure(provider, onEdit)
-            else -> Unit
+            when (provider) {
+                is ProviderSetting.Codex -> CodexOAuthConfigure(provider, onEdit)
+                is ProviderSetting.Grok -> GrokOAuthConfigure(provider, onEdit)
+                is ProviderSetting.GeminiOAuth -> GeminiOAuthConfigure(provider, onEdit)
+                else -> Unit
+            }
         }
     }
 }
@@ -244,7 +250,7 @@ private fun OAuthEnableRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.titleMedium)
-            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(
             checked = checked,
@@ -338,13 +344,13 @@ private fun GrokAccountCard(
         onDelete = onDelete,
     ) {
         account.usage?.planName?.let { plan ->
-            Text("Plan: $plan")
+            Text("Plan: $plan", style = MaterialTheme.typography.bodyMedium)
         }
         account.usage?.weekly?.let {
             UsageWindow("Weekly limit", it.usedPercent, it.resetsAt)
         }
         account.usage?.let {
-            Text("Pay as you go: ${if (it.onDemandCap > 0.0) "enabled" else "disabled"}")
+            Text("Pay as you go: ${if (it.onDemandCap > 0.0) "enabled" else "disabled"}", style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -398,12 +404,12 @@ private fun OAuthAccountCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(title, style = MaterialTheme.typography.titleMedium)
                     if (subtitle.isNotBlank()) {
-                        Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Switch(checked = enabled, onCheckedChange = onEnabledChange)
             }
-            Text(status, color = MaterialTheme.colorScheme.primary)
+            Text(status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
             Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = usage)
             HorizontalDivider()
             Row(
@@ -425,8 +431,8 @@ private fun UsageWindow(label: String, usedPercent: Double, resetsAt: Long?) {
     val remaining = (100.0 - usedPercent).coerceIn(0.0, 100.0)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label)
-            Text("${remaining.toInt()}% remaining")
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+            Text("${remaining.toInt()}% remaining", style = MaterialTheme.typography.bodyMedium)
         }
         LinearProgressIndicator(
             progress = { (remaining / 100.0).toFloat() },
@@ -435,6 +441,7 @@ private fun UsageWindow(label: String, usedPercent: Double, resetsAt: Long?) {
         resetsAt?.let {
             Text(
                 "Resets ${DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it * 1000))}",
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -445,7 +452,7 @@ private fun UsageWindow(label: String, usedPercent: Double, resetsAt: Long?) {
 private fun OAuthStatusText(status: CodexOAuthStatus) {
     when (status) {
         CodexOAuthStatus.Idle -> Unit
-        CodexOAuthStatus.Waiting -> Text("Waiting for OpenAI authorization…")
+        CodexOAuthStatus.Waiting -> Text("Waiting for OpenAI authorization…", style = MaterialTheme.typography.bodyMedium)
         is CodexOAuthStatus.Success -> Unit
         is CodexOAuthStatus.Error -> Text("OpenAI sign-in failed: ${status.message}", color = MaterialTheme.colorScheme.error)
     }

@@ -188,6 +188,19 @@ class OAuthLoopbackCallbackServer(
         }
     }
 
+    /**
+     * Closes an owner that failed before it could receive a session handle. This is important
+     * for fixed-port providers: cancellation can happen between [openSession] returning and
+     * the caller assigning the returned session.
+     */
+    suspend fun close() {
+        lifecycleMutex.withLock {
+            callbacks.values.forEach { it.result.cancel() }
+            callbacks.clear()
+            stopServerIfIdle()
+        }
+    }
+
     internal suspend fun closeSession(
         expectedState: String,
         callback: CompletableDeferred<OAuthCallback>,

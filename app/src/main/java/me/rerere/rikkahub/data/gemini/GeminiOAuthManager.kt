@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import me.rerere.oauth.CustomTabsOAuthAuthorizationLauncher
+import me.rerere.oauth.BrowserOAuthAuthorizationLauncher
 import me.rerere.oauth.OAuthAuthorizationLauncher
 import me.rerere.oauth.OAuthHttpClient
 import me.rerere.oauth.OAuthHttpClient.AuthorizationCodeTokenRequest
@@ -32,7 +32,7 @@ class GeminiOAuthManager(
     private val scope: AppScope,
     private val client: OkHttpClient,
     private val repository: GeminiAccountRepository,
-    private val authorizationLauncher: OAuthAuthorizationLauncher = CustomTabsOAuthAuthorizationLauncher,
+    private val authorizationLauncher: OAuthAuthorizationLauncher = BrowserOAuthAuthorizationLauncher,
 ) {
     private val _status = MutableStateFlow<GeminiOAuthStatus>(GeminiOAuthStatus.Idle)
     val status: StateFlow<GeminiOAuthStatus> = _status.asStateFlow()
@@ -47,17 +47,30 @@ class GeminiOAuthManager(
             var server: OAuthLoopbackCallbackServer? = null
             var session: me.rerere.oauth.OAuthLoopbackCallbackSession? = null
             try {
-                // Google's installed-app client has a registered loopback port
-                val activeServer = OAuthLoopbackCallbackServer(
-                    port = CALLBACK_PORT,
-                    callbackPath = CALLBACK_PATH,
-                    redirectHost = "localhost",
+                // Prefer Antigravity's usual loopback port, but fall back to an ephemeral
+                // loopback port if a stale process or another local client already owns it.
+                // Google installed-app clients accept loopback redirects with a varying port.
+                var callbackError: Throwable? = null
+                for (port in CALLBACK_PORTS) {
+                    val candidate = OAuthLoopbackCallbackServer(
+                        port = port,
+                        callbackPath = CALLBACK_PATH,
+                        redirectHost = "localhost",
+                    )
+                    try {
+                        val candidateSession = candidate.openSession(state)
+                        server = candidate
+                        session = candidateSession
+                        break
+                    } catch (error: Throwable) {
+                        callbackError = error
+                        runCatching { candidate.close() }
+                    }
+                }
+                val activeSession = session ?: throw IllegalStateException(
+                    "Unable to start the Google OAuth callback server",
+                    callbackError,
                 )
-                server = activeServer
-                // Match the original loopback browser flow without adding a foreground-service
-                // notification to the status bar.
-                val activeSession = activeServer.openSession(state)
-                session = activeSession
                 val redirectUri = activeSession.redirectUri
 
                 val url = oauth.buildAuthorizationUrl(
@@ -112,6 +125,7 @@ class GeminiOAuthManager(
                 _status.value = GeminiOAuthStatus.Error(error.message ?: "Gemini sign-in failed")
             } finally {
                 session?.close()
+                server?.close()
                 server = null
             }
         }
@@ -157,8 +171,7 @@ class GeminiOAuthManager(
             "https://www.googleapis.com/auth/cclog " +
             "https://www.googleapis.com/auth/experimentsandconfigs"
 
-        // Antigravity registers a single fixed loopback port with the OAuth client
-        private const val CALLBACK_PORT = 51121
+        private val CALLBACK_PORTS = listOf(51121, 0)
         private const val CALLBACK_PATH = "/oauth-callback"
     }
 }

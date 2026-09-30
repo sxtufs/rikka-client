@@ -19,3 +19,23 @@ object CustomTabsOAuthAuthorizationLauncher : OAuthAuthorizationLauncher {
         intent.launchUrl(context, authorizationUrl.toUri())
     }
 }
+object CustomTabsOAuthAuthorizationLauncher : OAuthAuthorizationLauncher {
+    override fun launch(context: Context, authorizationUrl: String) {
+        val intent = CustomTabsIntent.Builder()
+            .setShowTitle(true)
+            .build()
+        intent.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        intent.launchUrl(context, authorizationUrl.toUri())
+    }
+}
+
+/** Opens the system browser instead of an in-app Custom Tab overlay. */
+object BrowserOAuthAuthorizationLauncher : OAuthAuthorizationLauncher {
+    override fun launch(context: Context, authorizationUrl: String) {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, authorizationUrl.toUri()).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        )
+    }
+}
