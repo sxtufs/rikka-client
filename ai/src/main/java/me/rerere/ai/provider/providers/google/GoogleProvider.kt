@@ -45,6 +45,8 @@ import me.rerere.ai.provider.providers.groupPartsByToolBoundary
 import me.rerere.ai.provider.stream.SseEvent
 import me.rerere.ai.registry.ModelRegistry
 import me.rerere.ai.ui.GoogleThoughtMetadata
+import me.rerere.ai.ui.MessageChunk
+import me.rerere.ai.ui.UIMessageChoice
 import me.rerere.ai.ui.ServerToolMetadata
 import me.rerere.ai.ui.ServerToolProtocol
 import me.rerere.ai.ui.ServerToolStatus
@@ -527,6 +529,38 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
             role = role,
             parts = parts,
             annotations = annotations
+        )
+    }
+
+    /** Parse one Cloud Code Assist stream envelope using the same Gemini candidate parser. */
+    fun parseStreamCandidates(jsonData: JsonObject, model: Model): MessageChunk? {
+        val candidates = jsonData["candidates"]?.jsonArray ?: return null
+        if (candidates.isEmpty()) return null
+        return MessageChunk(
+            id = Uuid.random().toString(),
+            model = model.modelId,
+            choices = candidates.mapIndexed { index, candidate ->
+                val candidateObj = candidate.jsonObject
+                val content = candidateObj["content"]?.jsonObject
+                val groundingMetadata = candidateObj["groundingMetadata"]?.jsonObject
+                val finishReason = candidateObj["finishReason"]?.jsonPrimitive?.contentOrNull
+                val message = content?.let {
+                    parseMessage(buildJsonObject {
+                        put("role", JsonPrimitive("model"))
+                        put("content", it)
+                        groundingMetadata?.let { metadata ->
+                            put("groundingMetadata", metadata)
+                        }
+                    })
+                }
+                UIMessageChoice(
+                    index = index,
+                    delta = message,
+                    message = null,
+                    finishReason = finishReason,
+                )
+            },
+            usage = parseUsageMeta(jsonData["usageMetadata"] as? JsonObject),
         )
     }
 

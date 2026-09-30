@@ -1481,4 +1481,7 @@
   <string name="grok_resets_at">Resets %1$s</string>
   <string name="grok_on_demand_cap">Pay as you go: %1$s cap</string>
   <string name="grok_on_demand_disabled">Pay as you go: disabled</string>
+  <string name="accessibility_edit_model">Edit model</string>
+  <string name="accessibility_edit_override">Edit override</string>
+  <string name="accessibility_remove_override">Remove override</string>
 </resources>
