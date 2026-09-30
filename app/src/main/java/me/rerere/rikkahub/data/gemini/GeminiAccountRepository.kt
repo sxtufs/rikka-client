@@ -282,7 +282,7 @@ class GeminiAccountRepository internal constructor(
          */
         const val CODE_ASSIST_ENDPOINT = "https://cloudcode-pa.googleapis.com"
 
-        private const val USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
+        private const val USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
         private const val REFRESH_MARGIN_MS = 30_000L
         private const val TIER_LEGACY = "legacy-tier"
         private const val ONBOARD_RETRY_INTERVAL_MS = 2_000L

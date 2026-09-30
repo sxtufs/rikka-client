@@ -276,6 +276,15 @@ private fun SettingProviderConfigPage(
             provider = internalProvider,
             onEdit = {
                 internalProvider = it
+                // OAuth enablement is a runtime switch rather than a text-form field. Persist it
+                // immediately so leaving the provider page does not silently revert the toggle.
+                if (
+                    it is ProviderSetting.Codex ||
+                    it is ProviderSetting.Grok ||
+                    it is ProviderSetting.GeminiOAuth
+                ) {
+                    onEdit(it.copyProvider(name = it.name.trim()))
+                }
             }
         )
 

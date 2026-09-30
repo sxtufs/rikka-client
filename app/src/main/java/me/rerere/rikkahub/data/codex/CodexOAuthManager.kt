@@ -50,10 +50,9 @@ class CodexOAuthManager(
                             callbackPath = CALLBACK_PATH,
                             redirectHost = "localhost",
                         )
-                        // Keep the loopback server alive while the browser is in the
-                        // foreground. Without the foreground-service-aware overload Android may
-                        // kill the process before OpenAI redirects back.
-                        val candidateSession = candidateServer.openSession(context, state)
+                        // Match the original desktop-style loopback flow. Do not start an
+                        // Android foreground-service notification for the browser handoff.
+                        val candidateSession = candidateServer.openSession(state)
                         callbackServer = candidateServer
                         session = candidateSession
                         break

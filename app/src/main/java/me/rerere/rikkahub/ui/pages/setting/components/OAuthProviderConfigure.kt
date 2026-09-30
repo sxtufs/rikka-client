@@ -440,7 +440,7 @@ private fun OAuthStatusText(status: CodexOAuthStatus) {
     when (status) {
         CodexOAuthStatus.Idle -> Unit
         CodexOAuthStatus.Waiting -> Text("Waiting for OpenAI authorization…")
-        is CodexOAuthStatus.Success -> Text("OpenAI account connected")
+        is CodexOAuthStatus.Success -> Unit
         is CodexOAuthStatus.Error -> Text("OpenAI sign-in failed: ${status.message}", color = MaterialTheme.colorScheme.error)
     }
 }
@@ -451,7 +451,7 @@ private fun GrokOAuthStatusText(status: GrokOAuthStatus) {
         GrokOAuthStatus.Idle -> Unit
         GrokOAuthStatus.Starting -> Text("Starting xAI sign-in…")
         is GrokOAuthStatus.AwaitingApproval -> Text("Approve xAI sign-in in your browser")
-        is GrokOAuthStatus.Success -> Text("xAI account connected")
+        is GrokOAuthStatus.Success -> Unit
         is GrokOAuthStatus.Error -> Text("xAI sign-in failed: ${status.message}", color = MaterialTheme.colorScheme.error)
     }
 }
@@ -461,7 +461,7 @@ private fun GeminiOAuthStatusText(status: GeminiOAuthStatus) {
     when (status) {
         GeminiOAuthStatus.Idle -> Unit
         GeminiOAuthStatus.Waiting -> Text("Waiting for Google authorization…")
-        is GeminiOAuthStatus.Success -> Text("Google account connected")
+        is GeminiOAuthStatus.Success -> Unit
         is GeminiOAuthStatus.Error -> Text("Google sign-in failed: ${status.message}", color = MaterialTheme.colorScheme.error)
     }
 }

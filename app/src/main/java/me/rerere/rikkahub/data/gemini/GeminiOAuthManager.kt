@@ -54,9 +54,9 @@ class GeminiOAuthManager(
                     redirectHost = "localhost",
                 )
                 server = activeServer
-                // The browser switch can background the app for several minutes. Tie the
-                // callback session to the OAuth foreground service so the local server survives.
-                val activeSession = activeServer.openSession(context, state)
+                // Match the original loopback browser flow without adding a foreground-service
+                // notification to the status bar.
+                val activeSession = activeServer.openSession(state)
                 session = activeSession
                 val redirectUri = activeSession.redirectUri
 
@@ -71,6 +71,7 @@ class GeminiOAuthManager(
                         additionalParameters = mapOf(
                             "access_type" to "offline",
                             "prompt" to "consent",
+                            "include_granted_scopes" to "true",
                         ),
                     )
                 )
@@ -149,7 +150,8 @@ class GeminiOAuthManager(
 
         // cclog and experimentsandconfigs are Antigravity-specific and are part of what the
         // consent screen is registered for, so the grant is rejected without them.
-        const val SCOPES = "https://www.googleapis.com/auth/cloud-platform " +
+        const val SCOPES = "openid " +
+            "https://www.googleapis.com/auth/cloud-platform " +
             "https://www.googleapis.com/auth/userinfo.email " +
             "https://www.googleapis.com/auth/userinfo.profile " +
             "https://www.googleapis.com/auth/cclog " +
