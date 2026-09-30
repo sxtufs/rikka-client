@@ -109,9 +109,9 @@ class GeminiProvider(
         messages: List<UIMessage>,
         params: TextGenerationParams,
     ): Flow<StreamChunk> = callbackFlow {
-        val account = repository.acquireAccount()
+        val account = repository.ensureProject(repository.acquireAccount())
         val project = account.projectId
-            ?: error("Gemini OAuth account has no Code Assist project; sign in again")
+            ?: error("Gemini OAuth account has no Code Assist project")
         val requestBody = buildJsonObject {
             put("project", project)
             put("model", params.model.modelId)

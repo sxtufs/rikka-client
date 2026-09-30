@@ -1400,4 +1400,6 @@ mDNSアドレス: .localホスト名を使用し、IPを知らなくても同じ
   <string name="chart_mode_table">表</string>
   <string name="chart_series">系列</string>
   <string name="chart_series_name">系列 %1$d</string>
+  <string name="codex_oauth_ports_unavailable">Codex OAuth コールバックサーバーを起動できません。利用可能なポートがありません。</string>
+  <string name="common_delete_confirm_message">「%s」を削除してもよろしいですか？この操作は取り消せません。</string>
 </resources>

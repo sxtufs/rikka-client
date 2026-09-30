@@ -101,7 +101,6 @@ class ChatVM(
 
     override fun onCleared() {
         voiceSession.stop()
-        super.onCleared()
         // 移除对话引用
         chatService.removeConversationReference(_conversationId)
     }

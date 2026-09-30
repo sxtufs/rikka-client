@@ -1400,4 +1400,6 @@ mDNS 地址：使用 .local 主机名，同一网络中的其他设备可通过�
   <string name="chart_mode_table">表格</string>
   <string name="chart_series">系列</string>
   <string name="chart_series_name">系列 %1$d</string>
+  <string name="codex_oauth_ports_unavailable">无法启动 Codex OAuth 回调服务器。没有可用端口。</string>
+  <string name="common_delete_confirm_message">确定要删除“%s”吗？此操作无法撤销。</string>
 </resources>

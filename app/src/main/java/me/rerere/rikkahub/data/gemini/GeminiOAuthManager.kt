@@ -48,9 +48,15 @@ class GeminiOAuthManager(
             var session: me.rerere.oauth.OAuthLoopbackCallbackSession? = null
             try {
                 // Google's installed-app client has a registered loopback port
-                server = OAuthLoopbackCallbackServer(port = CALLBACK_PORT, callbackPath = CALLBACK_PATH)
-                session = server.openSession(state)
-                val redirectUri = session.redirectUri
+                val activeServer = OAuthLoopbackCallbackServer(
+                    port = CALLBACK_PORT,
+                    callbackPath = CALLBACK_PATH,
+                    redirectHost = "localhost",
+                )
+                server = activeServer
+                val activeSession = activeServer.openSession(state)
+                session = activeSession
+                val redirectUri = activeSession.redirectUri
 
                 val url = oauth.buildAuthorizationUrl(
                     AuthorizationRequest(
@@ -69,7 +75,7 @@ class GeminiOAuthManager(
                 _status.value = GeminiOAuthStatus.Waiting
                 authorizationLauncher.launch(context, url)
 
-                val callback = session.awaitCallback(10.minutes)
+                val callback = activeSession.awaitCallback(10.minutes)
                     ?: error("Google sign-in timed out")
                 if (callback.state != state) error("OAuth state mismatch")
                 if (!callback.error.isNullOrBlank()) {

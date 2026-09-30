@@ -39,6 +39,7 @@ data class OAuthCallback(
 class OAuthLoopbackCallbackServer(
     private val port: Int = 0,
     callbackPath: String = "/oauth/callback",
+    private val redirectHost: String = LOOPBACK_HOST,
 ) {
     private class CallbackRegistration {
         val result = CompletableDeferred<OAuthCallback>()
@@ -126,7 +127,7 @@ class OAuthLoopbackCallbackServer(
         try {
             newServer.startSuspend(wait = false)
             val resolvedPort = newServer.engine.resolvedConnectors().single().port
-            return "http://$LOOPBACK_HOST:$resolvedPort$callbackPath".also {
+            return "http://$redirectHost:$resolvedPort$callbackPath".also {
                 server = newServer
                 redirectUri = it
             }

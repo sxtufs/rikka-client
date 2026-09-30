@@ -90,6 +90,18 @@ class GeminiAccountRepository internal constructor(
         error("No available Gemini account")
     }
 
+    suspend fun setEnabled        error("No available Gemini account")
+    }
+
+    /** Resolve the project for accounts saved before projectId was persisted. */
+    suspend fun ensureProject(account: GeminiAccount): GeminiAccount = mutex.withLock {
+        if (!account.projectId.isNullOrBlank()) return@withLock account
+        val projectId = discoverProject(account.accessToken)
+        val updated = account.copy(projectId = projectId)
+        replaceAccount(account.id) { updated }
+        updated
+    }
+
     suspend fun setEnabled(accountId: String, enabled: Boolean) = mutex.withLock {
         replaceAccount(accountId) { it.copy(enabled = enabled) }
     }
@@ -156,27 +168,25 @@ class GeminiAccountRepository internal constructor(
      * decoded into a stable identity without a network round trip.
      */
     private suspend fun fetchIdentity(accessToken: String): GeminiIdentity = withContext(Dispatchers.IO) {
-        val response = runCatching {
-            client.newCall(
-                Request.Builder()
-                    .url(USERINFO_URL)
-                    .header("Authorization", "Bearer $accessToken")
-                    .get()
-                    .build()
-            ).await()
-        }.getOrNull() ?: return@withContext GeminiIdentity()
-        if (!response.isSuccessful) {
-            response.close()
-            return@withContext GeminiIdentity()
+        client.newCall(
+            Request.Builder()
+                .url(USERINFO_URL)
+                .header("Authorization", "Bearer $accessToken")
+                .get()
+                .build()
+        ).await().use { response ->
+            if (!response.isSuccessful) {
+                error("Google userinfo failed: ${response.code}")
+            }
+            val body = json.parseToJsonElement(response.body.string()).jsonObject
+            GeminiIdentity(
+                sub = body["sub"]?.jsonPrimitive?.contentOrNull
+                    ?: error("Google userinfo did not return sub"),
+                email = body["email"]?.jsonPrimitive?.contentOrNull
+                    ?: error("Google userinfo did not return email"),
+                name = body["name"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            )
         }
-        val body = runCatching {
-            json.parseToJsonElement(response.body.string()).jsonObject
-        }.getOrNull() ?: return@withContext GeminiIdentity()
-        GeminiIdentity(
-            sub = body["sub"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-            email = body["email"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-            name = body["name"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-        )
     }
 
     /**

@@ -1400,4 +1400,6 @@
   <string name="chart_mode_table">Таблица</string>
   <string name="chart_series">Ряд</string>
   <string name="chart_series_name">Ряд %1$d</string>
+  <string name="codex_oauth_ports_unavailable">Не удалось запустить сервер обратного вызова Codex OAuth. Нет доступных портов.</string>
+  <string name="common_delete_confirm_message">Удалить "%s"? Это действие нельзя отменить.</string>
 </resources>

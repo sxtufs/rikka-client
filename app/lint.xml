@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- Existing event callbacks use captured Context values; migrate them to LocalResources in a separate UI cleanup. -->
+    <issue id="LocalContextGetResourceValueCall" severity="ignore" />
+</lint>

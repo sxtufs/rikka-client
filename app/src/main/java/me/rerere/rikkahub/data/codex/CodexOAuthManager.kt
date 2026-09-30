@@ -42,13 +42,33 @@ class CodexOAuthManager(
             var callbackServer: OAuthLoopbackCallbackServer? = null
             var session: me.rerere.oauth.OAuthLoopbackCallbackSession? = null
             try {
-                callbackServer = OAuthLoopbackCallbackServer(port = 0, callbackPath = "/auth/callback")
-                session = callbackServer.openSession(state)
+                var callbackError: Throwable? = null
+                for (port in CALLBACK_PORTS) {
+                    try {
+                        val candidateServer = OAuthLoopbackCallbackServer(
+                            port = port,
+                            callbackPath = CALLBACK_PATH,
+                            redirectHost = "localhost",
+                        )
+                        val candidateSession = candidateServer.openSession(state)
+                        callbackServer = candidateServer
+                        session = candidateSession
+                        break
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Throwable) {
+                        callbackError = error
+                    }
+                }
+                val activeSession = session ?: throw IllegalStateException(
+                    CALLBACK_PORTS_UNAVAILABLE,
+                    callbackError,
+                )
                 val url = oauth.buildAuthorizationUrl(
                     AuthorizationRequest(
                         authorizationEndpoint = AUTHORIZE_URL,
                         clientId = CLIENT_ID,
-                        redirectUri = session.redirectUri,
+                        redirectUri = activeSession.redirectUri,
                         pkce = pkce,
                         state = state,
                         scope = DEFAULT_SCOPES,
@@ -61,7 +81,7 @@ class CodexOAuthManager(
                 )
                 _status.value = CodexOAuthStatus.Waiting
                 authorizationLauncher.launch(context, url)
-                val callback = session.awaitCallback(10.minutes)
+                val callback = activeSession.awaitCallback(10.minutes)
                     ?: error("OpenAI sign-in timed out")
                 if (callback.state != state) error("OAuth state mismatch")
                 if (!callback.error.isNullOrBlank()) {
@@ -74,7 +94,7 @@ class CodexOAuthManager(
                         clientId = CLIENT_ID,
                         code = code,
                         codeVerifier = pkce.verifier,
-                        redirectUri = session.redirectUri,
+                        redirectUri = activeSession.redirectUri,
                     )
                 )
                 val tokenJson = buildJsonObject {
@@ -120,6 +140,8 @@ class CodexOAuthManager(
         const val TOKEN_URL = "https://auth.openai.com/oauth/token"
         const val DEFAULT_SCOPES = "openid profile email offline_access"
         const val REFRESH_SCOPES = DEFAULT_SCOPES
+        private val CALLBACK_PORTS = listOf(1455, 1457)
+        private const val CALLBACK_PATH = "/auth/callback"
     }
 
     private val CALLBACK_PORTS_UNAVAILABLE = "OAuth callback ports are unavailable"
