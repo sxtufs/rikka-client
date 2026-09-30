@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 import me.rerere.ai.provider.ProviderManager
 import me.rerere.common.http.AcceptLanguageBuilder
 import me.rerere.rikkahub.BuildConfig
+import me.rerere.rikkahub.AppScope
 import me.rerere.rikkahub.data.ai.AIRequestInterceptor
 import me.rerere.rikkahub.data.ai.RequestLoggingInterceptor
 import me.rerere.rikkahub.data.ai.transformers.AssistantTemplateLoader
@@ -44,11 +45,21 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import org.koin.dsl.module
+import org.koin.core.qualifier.named
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
+
+private fun oauthClient(): OkHttpClient = OkHttpClient.Builder()
+    .connectTimeout(20, TimeUnit.SECONDS)
+    .readTimeout(10, TimeUnit.MINUTES)
+    .writeTimeout(120, TimeUnit.SECONDS)
+    .followSslRedirects(true)
+    .followRedirects(true)
+    .retryOnConnectionFailure(true)
+    .build()
 
 val dataSourceModule = module {
     single {
@@ -131,7 +142,7 @@ val dataSourceModule = module {
     single {
         CodexAccountRepository(
             store = get(),
-            client = get(),
+            client = get(named("codex")),
             json = get(),
         )
     }
@@ -139,8 +150,8 @@ val dataSourceModule = module {
     single {
         CodexOAuthManager(
             context = get(),
-            scope = get(),
-            client = get(),
+            scope = get<AppScope>(),
+            client = get(named("codex")),
             repository = get(),
         )
     }
@@ -150,7 +161,7 @@ val dataSourceModule = module {
     single {
         GrokAccountRepository(
             store = get(),
-            client = get(),
+            client = get(named("grok")),
             json = get(),
         )
     }
@@ -158,8 +169,8 @@ val dataSourceModule = module {
     single {
         GrokOAuthManager(
             context = get(),
-            scope = get(),
-            client = get(),
+            scope = get<AppScope>(),
+            client = get(named("grok")),
             repository = get(),
             json = get(),
         )
@@ -172,7 +183,7 @@ val dataSourceModule = module {
     single {
         GeminiAccountRepository(
             store = get(),
-            client = get(),
+            client = get(named("gemini")),
             json = get(),
         )
     }
@@ -180,11 +191,15 @@ val dataSourceModule = module {
     single {
         GeminiOAuthManager(
             context = get(),
-            scope = get(),
-            client = get(),
+            scope = get<AppScope>(),
+            client = get(named("gemini")),
             repository = get(),
         )
     }
+
+    single<OkHttpClient>(named("codex")) { oauthClient() }
+    single<OkHttpClient>(named("grok")) { oauthClient() }
+    single<OkHttpClient>(named("gemini")) { oauthClient() }
 
     single<OkHttpClient> {
         val settingsStore: SettingsStore = get()
@@ -278,25 +293,25 @@ val dataSourceModule = module {
             manager.registerProvider(
                 "codex",
                 CodexProvider(
-                    client = get(),
+                    client = get(named("codex")),
                     repository = get(),
                     json = get(),
-                    scope = get(),
+                    scope = get<AppScope>(),
                 )
             )
             manager.registerProvider(
                 "grok",
                 GrokProvider(
-                    client = get(),
+                    client = get(named("grok")),
                     repository = get(),
                     json = get(),
-                    scope = get(),
+                    scope = get<AppScope>(),
                 )
             )
             manager.registerProvider(
                 "gemini_oauth",
                 GeminiProvider(
-                    client = get(),
+                    client = get(named("gemini")),
                     repository = get(),
                     json = get(),
                 )
