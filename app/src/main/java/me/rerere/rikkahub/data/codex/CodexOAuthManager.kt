@@ -28,6 +28,8 @@ import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URLEncoder
+import java.net.ServerSocket
+import java.net.BindException
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
@@ -93,6 +95,10 @@ class CodexOAuthManager(
         var lastError: Throwable? = null
         for (port in CALLBACK_PORTS) {
             try {
+                if (!isPortAvailable(port)) {
+                    lastError = BindException("OAuth callback port $port is already in use")
+                    continue
+                }
                 server = embeddedServer(CIO, host = "127.0.0.1", port = port) {
                     routing {
                         get("/auth/callback") {
@@ -148,6 +154,14 @@ class CodexOAuthManager(
             }
         }
         throw IllegalStateException(CALLBACK_PORTS_UNAVAILABLE, lastError)
+    }
+
+    private fun isPortAvailable(port: Int): Boolean {
+        if (port == 0) return true
+        return runCatching {
+            ServerSocket(port, 1, java.net.InetAddress.getLoopbackAddress()).use { }
+            true
+        }.getOrDefault(false)
     }
 
     private suspend fun awaitNetworkUnblocked() {

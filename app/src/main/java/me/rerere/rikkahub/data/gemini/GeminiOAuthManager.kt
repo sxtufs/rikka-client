@@ -92,7 +92,7 @@ class GeminiOAuthManager(
         var lastError: Throwable? = null
         for (port in CALLBACK_PORTS) {
             try {
-                server = embeddedServer(CIO, host = "127.0.0.1", port = port) {
+                val newServer = embeddedServer(CIO, host = "127.0.0.1", port = port) {
                     routing {
                         get(CALLBACK_PATH) {
                             val callbackState = call.request.queryParameters["state"]
@@ -104,18 +104,14 @@ class GeminiOAuthManager(
                                     _status.value = GeminiOAuthStatus.Error("OAuth state mismatch")
                                     call.respondText(callbackPage(false), ContentType.Text.Html)
                                 }
-
                                 !error.isNullOrBlank() -> {
                                     _status.value = GeminiOAuthStatus.Error(error)
                                     call.respondText(callbackPage(false), ContentType.Text.Html)
                                 }
-
                                 code.isNullOrBlank() -> {
-                                    _status.value =
-                                        GeminiOAuthStatus.Error("Missing authorization code")
+                                    _status.value = GeminiOAuthStatus.Error("Missing authorization code")
                                     call.respondText(callbackPage(false), ContentType.Text.Html)
                                 }
-
                                 else -> {
                                     call.respondText(callbackPage(true), ContentType.Text.Html)
                                     scope.launch {
@@ -124,24 +120,19 @@ class GeminiOAuthManager(
                                             val account = exchangeCode(code, redirectUri)
                                             _status.value = GeminiOAuthStatus.Success(account.id)
                                         } catch (error: Throwable) {
-                                            Log.e(
-                                                TAG,
-                                                "OAuth token exchange failed: " +
-                                                    "${error::class.java.name}: ${error.message}",
-                                                error,
-                                            )
-                                            _status.value = GeminiOAuthStatus.Error(
-                                                error.message ?: "OAuth token exchange failed"
-                                            )
+                                            Log.e(TAG, "OAuth token exchange failed: ${error::class.java.name}: ${error.message}", error)
+                                            _status.value = GeminiOAuthStatus.Error(error.message ?: "OAuth token exchange failed")
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                }.startSuspend(wait = false)
-                callbackPort = port
-                return port
+                }
+                newServer.startSuspend(wait = false)
+                server = newServer
+                callbackPort = newServer.engine.resolvedConnectors().single().port
+                return callbackPort!!
             } catch (error: Throwable) {
                 lastError = error
             }
