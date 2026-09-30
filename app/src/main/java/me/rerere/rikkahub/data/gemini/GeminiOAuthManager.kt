@@ -54,35 +54,32 @@ class GeminiOAuthManager(
 
     fun startLogin() {
         val state = randomUrlSafe(32)
-        try {
-            val port = ensureCallbackServer()
-            val redirect = "http://localhost:$port$CALLBACK_PATH"
-            sessions[state] = redirect
-            _status.value = GeminiOAuthStatus.Waiting
-
-            val authUrl = Uri.parse(AUTHORIZE_URL).buildUpon()
-                .appendQueryParameter("response_type", "code")
-                .appendQueryParameter("client_id", CLIENT_ID)
-                .appendQueryParameter("redirect_uri", redirect)
-                .appendQueryParameter("scope", SCOPES)
-                .appendQueryParameter("state", state)
-                .appendQueryParameter("access_type", "offline")
-                .appendQueryParameter("prompt", "consent")
-                .build()
-            context.startActivity(
-                Intent(Intent.ACTION_VIEW, authUrl).apply {
+        scope.launch {
+            try {
+                val port = ensureCallbackServer()
+                val redirect = "http://localhost:$port$CALLBACK_PATH"
+                sessions[state] = redirect
+                _status.value = GeminiOAuthStatus.Waiting
+                val authUrl = Uri.parse(AUTHORIZE_URL).buildUpon()
+                    .appendQueryParameter("response_type", "code")
+                    .appendQueryParameter("client_id", CLIENT_ID)
+                    .appendQueryParameter("redirect_uri", redirect)
+                    .appendQueryParameter("scope", SCOPES)
+                    .appendQueryParameter("state", state)
+                    .appendQueryParameter("access_type", "offline")
+                    .appendQueryParameter("prompt", "consent")
+                    .build()
+                context.startActivity(Intent(Intent.ACTION_VIEW, authUrl).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            )
-        } catch (error: Throwable) {
-            sessions.remove(state)
-            _status.value = GeminiOAuthStatus.Error(
-                if (error.message == CALLBACK_PORTS_UNAVAILABLE) {
-                    context.getString(R.string.gemini_oauth_ports_unavailable)
-                } else {
-                    error.message ?: "Unable to open the Google sign-in page"
-                }
-            )
+                })
+            } catch (error: Throwable) {
+                sessions.remove(state)
+                _status.value = GeminiOAuthStatus.Error(
+                    if (error.message == CALLBACK_PORTS_UNAVAILABLE) {
+                        context.getString(R.string.gemini_oauth_ports_unavailable)
+                    } else error.message ?: "Unable to open the Google sign-in page"
+                )
+            }
         }
     }
 
@@ -90,8 +87,7 @@ class GeminiOAuthManager(
         _status.value = GeminiOAuthStatus.Idle
     }
 
-    @Synchronized
-    private fun ensureCallbackServer(): Int {
+    private suspend fun ensureCallbackServer(): Int {
         callbackPort?.let { return it }
         var lastError: Throwable? = null
         for (port in CALLBACK_PORTS) {
@@ -143,7 +139,7 @@ class GeminiOAuthManager(
                             }
                         }
                     }
-                }.start(wait = false)
+                }.startSuspend(wait = false)
                 callbackPort = port
                 return port
             } catch (error: Throwable) {
@@ -249,9 +245,9 @@ class GeminiOAuthManager(
             "https://www.googleapis.com/auth/experimentsandconfigs"
         private const val CALLBACK_PATH = "/oauth-callback"
 
-        // Antigravity registers a single fixed loopback port with the OAuth client, so unlike a
-        // free-choice port there is nothing to fall back to if it is taken.
-        private val CALLBACK_PORTS = listOf(51121)
+        // Loopback installed-app redirects accept an ephemeral local port. This avoids
+        // collisions with an existing Antigravity/bridge process or a stale callback server.
+        private val CALLBACK_PORTS = listOf(0)
     }
 }
 

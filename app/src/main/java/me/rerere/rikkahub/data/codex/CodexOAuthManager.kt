@@ -48,45 +48,39 @@ class CodexOAuthManager(
 
     fun startLogin() {
         val state = randomUrlSafe(32)
-        try {
-            val verifier = randomUrlSafe(64)
-            val challenge = Base64.getUrlEncoder().withoutPadding().encodeToString(
-                MessageDigest.getInstance("SHA-256").digest(verifier.encodeToByteArray())
-            )
-            val port = ensureCallbackServer()
-            val redirect = "http://localhost:$port/auth/callback"
-            sessions[state] = OAuthSession(
-                verifier = verifier,
-                redirectUri = redirect,
-            )
-            _status.value = CodexOAuthStatus.Waiting
-
-            val authUrl = Uri.parse(AUTHORIZE_URL).buildUpon()
-                .appendQueryParameter("response_type", "code")
-                .appendQueryParameter("client_id", CLIENT_ID)
-                .appendQueryParameter("redirect_uri", redirect)
-                .appendQueryParameter("scope", DEFAULT_SCOPES)
-                .appendQueryParameter("state", state)
-                .appendQueryParameter("code_challenge", challenge)
-                .appendQueryParameter("code_challenge_method", "S256")
-                .appendQueryParameter("id_token_add_organizations", "true")
-                .appendQueryParameter("codex_cli_simplified_flow", "true")
-                .appendQueryParameter("originator", "codex_cli_rs")
-                .build()
-            context.startActivity(
-                Intent(Intent.ACTION_VIEW, authUrl).apply {
+        scope.launch {
+            try {
+                val verifier = randomUrlSafe(64)
+                val challenge = Base64.getUrlEncoder().withoutPadding().encodeToString(
+                    MessageDigest.getInstance("SHA-256").digest(verifier.encodeToByteArray())
+                )
+                val port = ensureCallbackServer()
+                val redirect = "http://localhost:$port/auth/callback"
+                sessions[state] = OAuthSession(verifier = verifier, redirectUri = redirect)
+                _status.value = CodexOAuthStatus.Waiting
+                val authUrl = Uri.parse(AUTHORIZE_URL).buildUpon()
+                    .appendQueryParameter("response_type", "code")
+                    .appendQueryParameter("client_id", CLIENT_ID)
+                    .appendQueryParameter("redirect_uri", redirect)
+                    .appendQueryParameter("scope", DEFAULT_SCOPES)
+                    .appendQueryParameter("state", state)
+                    .appendQueryParameter("code_challenge", challenge)
+                    .appendQueryParameter("code_challenge_method", "S256")
+                    .appendQueryParameter("id_token_add_organizations", "true")
+                    .appendQueryParameter("codex_cli_simplified_flow", "true")
+                    .appendQueryParameter("originator", "codex_cli_rs")
+                    .build()
+                context.startActivity(Intent(Intent.ACTION_VIEW, authUrl).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            )
-        } catch (error: Throwable) {
-            sessions.remove(state)
-            _status.value = CodexOAuthStatus.Error(
-                if (error.message == CALLBACK_PORTS_UNAVAILABLE) {
-                    context.getString(R.string.codex_oauth_ports_unavailable)
-                } else {
-                    error.message ?: "Unable to open the OpenAI sign-in page"
-                }
-            )
+                })
+            } catch (error: Throwable) {
+                sessions.remove(state)
+                _status.value = CodexOAuthStatus.Error(
+                    if (error.message == CALLBACK_PORTS_UNAVAILABLE) {
+                        context.getString(R.string.codex_oauth_ports_unavailable)
+                    } else error.message ?: "Unable to open the OpenAI sign-in page"
+                )
+            }
         }
     }
 
@@ -94,8 +88,7 @@ class CodexOAuthManager(
         _status.value = CodexOAuthStatus.Idle
     }
 
-    @Synchronized
-    private fun ensureCallbackServer(): Int {
+    private suspend fun ensureCallbackServer(): Int {
         callbackPort?.let { return it }
         var lastError: Throwable? = null
         for (port in CALLBACK_PORTS) {
@@ -147,7 +140,7 @@ class CodexOAuthManager(
                             }
                         }
                     }
-                }.start(wait = false)
+                }.startSuspend(wait = false)
                 callbackPort = port
                 return port
             } catch (error: Throwable) {
