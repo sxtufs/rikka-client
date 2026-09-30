@@ -270,6 +270,30 @@ private fun SettingProviderConfigPage(
     onEdit: (ProviderSetting) -> Unit,
     onDelete: () -> Unit
 ) {
+    if (provider is ProviderSetting.Codex) {
+        var localProvider by remember(provider) { mutableStateOf(provider) }
+        CodexProviderConfigure(provider = localProvider) {
+            localProvider = it
+            onEdit(it)
+        }
+        return
+    }
+    if (provider is ProviderSetting.Grok) {
+        var localProvider by remember(provider) { mutableStateOf(provider) }
+        GrokProviderConfigure(provider = localProvider) {
+            localProvider = it
+            onEdit(it)
+        }
+        return
+    }
+    if (provider is ProviderSetting.GeminiOAuth) {
+        var localProvider by remember(provider) { mutableStateOf(provider) }
+        GeminiProviderConfigure(provider = localProvider) {
+            localProvider = it
+            onEdit(it)
+        }
+        return
+    }
     var internalProvider by remember(provider) { mutableStateOf(provider) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -281,24 +305,10 @@ private fun SettingProviderConfigPage(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        when (val currentProvider = internalProvider) {
-            is ProviderSetting.Codex -> CodexProviderConfigure(
-                provider = currentProvider,
-                onEdit = { internalProvider = it },
-            )
-            is ProviderSetting.Grok -> GrokProviderConfigure(
-                provider = currentProvider,
-                onEdit = { internalProvider = it },
-            )
-            is ProviderSetting.GeminiOAuth -> GeminiProviderConfigure(
-                provider = currentProvider,
-                onEdit = { internalProvider = it },
-            )
-            else -> ProviderConfigure(
-                provider = currentProvider,
-                onEdit = { internalProvider = it },
-            )
-        }
+        ProviderConfigure(
+            provider = internalProvider,
+            onEdit = { internalProvider = it },
+        )
 
         if (internalProvider is ProviderSetting.OpenAI) {
             SettingProviderBalanceOption(
