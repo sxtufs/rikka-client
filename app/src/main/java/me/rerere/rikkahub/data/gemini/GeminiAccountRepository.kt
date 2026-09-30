@@ -177,8 +177,10 @@ class GeminiAccountRepository internal constructor(
             }
             val body = json.parseToJsonElement(response.body.string()).jsonObject
             GeminiIdentity(
+                // OIDC userinfo returns `sub`; Google's legacy v1 endpoint returns `id`.
                 sub = body["sub"]?.jsonPrimitive?.contentOrNull
-                    ?: error("Google userinfo did not return sub"),
+                    ?: body["id"]?.jsonPrimitive?.contentOrNull
+                    ?: error("Google userinfo did not return a stable user id"),
                 email = body["email"]?.jsonPrimitive?.contentOrNull
                     ?: error("Google userinfo did not return email"),
                 name = body["name"]?.jsonPrimitive?.contentOrNull.orEmpty(),
@@ -206,7 +208,7 @@ class GeminiAccountRepository internal constructor(
         ).await()
         val loadBody = loadResponse.body.string()
         if (!loadResponse.isSuccessful) {
-            error("loadCodeAssist failed: ${loadResponse.code} $loadBody")
+            error("loadCodeAssist failed (HTTP ${loadResponse.code})")
         }
         val load = json.parseToJsonElement(loadBody).jsonObject
         readProjectId(load["cloudaicompanionProject"])
@@ -232,7 +234,7 @@ class GeminiAccountRepository internal constructor(
             ).await()
             val body = response.body.string()
             if (!response.isSuccessful) {
-                error("onboardUser failed: ${response.code} $body")
+                error("onboardUser failed (HTTP ${response.code})")
             }
             val parsed = json.parseToJsonElement(body).jsonObject
             operation = parsed
@@ -240,7 +242,7 @@ class GeminiAccountRepository internal constructor(
         }
         val finished = operation ?: error("onboardUser returned nothing")
         readProjectId(finished["response"]?.jsonObject?.get("cloudaicompanionProject"))
-            ?: error("onboardUser finished without returning a project: $finished")
+            ?: error("onboardUser finished without returning a Cloud Code project")
     }
 
     private fun Request.Builder.antigravityHeaders(accessToken: String): Request.Builder =
@@ -280,7 +282,7 @@ class GeminiAccountRepository internal constructor(
          */
         const val CODE_ASSIST_ENDPOINT = "https://cloudcode-pa.googleapis.com"
 
-        private const val USERINFO_URL = "https://www.googleapis.com/oauth2/v1/userinfo?alt=json"
+        private const val USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
         private const val REFRESH_MARGIN_MS = 30_000L
         private const val TIER_LEGACY = "legacy-tier"
         private const val ONBOARD_RETRY_INTERVAL_MS = 2_000L

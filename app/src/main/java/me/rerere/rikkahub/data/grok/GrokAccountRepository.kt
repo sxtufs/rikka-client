@@ -15,6 +15,7 @@ import me.rerere.common.http.await
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.security.MessageDigest
 
 class GrokAccountRepository internal constructor(
     private val store: GrokCredentialStore,
@@ -40,18 +41,27 @@ class GrokAccountRepository internal constructor(
             token["id_token"]?.jsonPrimitive?.contentOrNull ?: accessToken,
             json,
         )
+        val refreshToken = token["refresh_token"]?.jsonPrimitive?.contentOrNull
+        val fallbackId = stableGrokAccountId(
+            identity = identity,
+            refreshToken = refreshToken,
+            accessToken = accessToken,
+        )
         val existing = state.accounts.firstOrNull {
-            (it.userId.isNotBlank() && it.userId == identity.userId) ||
-                (it.email.isNotBlank() && it.email == identity.email)
+            (identity.userId.isNotBlank() && it.userId == identity.userId) ||
+                (identity.email.isNotBlank() && it.email == identity.email) ||
+                it.id == fallbackId
         }
         val account = GrokAccount(
-            id = existing?.id ?: identity.userId.ifBlank { identity.email }.ifBlank { accessToken.take(16) },
+            id = existing?.id ?: fallbackId,
             userId = identity.userId,
             name = identity.name,
             email = identity.email,
             accessToken = accessToken,
-            refreshToken = token["refresh_token"]?.jsonPrimitive?.contentOrNull
-                ?: existing?.refreshToken ?: error("Missing refresh token"),
+            // xAI may omit refresh_token for CLI sessions. Keep an existing token when
+            // available; otherwise the account remains usable until expiry and then asks the
+            // user to sign in again instead of failing the initial login.
+            refreshToken = refreshToken ?: existing?.refreshToken.orEmpty(),
             expiresAt = System.currentTimeMillis() +
                 (token["expires_in"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 3600L) * 1000,
             enabled = existing?.enabled ?: true,
@@ -91,7 +101,14 @@ class GrokAccountRepository internal constructor(
     suspend fun refreshAccount(accountId: String): GrokAccount = mutex.withLock {
         val account = state.accounts.firstOrNull { it.id == accountId }
             ?: error("Grok account not found")
-        val fresh = ensureFreshLocked(account, force = true)
+        // Some official CLI sessions do not expose a refresh token. They can still fetch
+        // usage immediately after login; once the access token expires, acquireAccount() will
+        // invalidate the session and the UI will ask for a new login.
+        val fresh = if (account.refreshToken.isBlank()) {
+            account
+        } else {
+            ensureFreshLocked(account, force = true)
+        }
         // Usage/plan fetch is best-effort: never fail a token refresh just because billing is down.
         runCatching { fetchUsageLocked(fresh) }.getOrDefault(fresh)
     }
@@ -100,6 +117,10 @@ class GrokAccountRepository internal constructor(
 
     private suspend fun ensureFreshLocked(account: GrokAccount, force: Boolean = false): GrokAccount {
         if (!force && account.expiresAt > System.currentTimeMillis() + 30_000L) return account
+        if (account.refreshToken.isBlank()) {
+            replaceAccount(account.id) { it.copy(tokenStatus = GrokTokenStatus.INVALID) }
+            error("Grok sign-in expired; sign in again")
+        }
         val response = withContext(Dispatchers.IO) {
             val form = FormBody.Builder()
                 .add("grant_type", "refresh_token")
@@ -193,4 +214,21 @@ class GrokAccountRepository internal constructor(
         private const val CREDITS_URL = "https://cli-chat-proxy.grok.com/v1/billing?format=credits"
         private const val SETTINGS_URL = "https://cli-chat-proxy.grok.com/v1/settings"
     }
+}
+
+internal fun stableGrokAccountId(
+    identity: GrokIdentity,
+    refreshToken: String?,
+    accessToken: String,
+): String {
+    val claimedIdentity = identity.userId.ifBlank { identity.email }
+    if (claimedIdentity.isNotBlank()) return claimedIdentity
+
+    // Device-token responses may omit an id_token. Use a one-way stable key so signing in again
+    // updates the same account without persisting a token in the account id.
+    val seed = refreshToken ?: accessToken
+    val digest = MessageDigest.getInstance("SHA-256")
+        .digest(seed.toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    return "grok-$digest"
 }

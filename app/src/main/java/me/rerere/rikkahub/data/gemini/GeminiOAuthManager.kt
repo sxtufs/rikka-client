@@ -54,7 +54,9 @@ class GeminiOAuthManager(
                     redirectHost = "localhost",
                 )
                 server = activeServer
-                val activeSession = activeServer.openSession(state)
+                // The browser switch can background the app for several minutes. Tie the
+                // callback session to the OAuth foreground service so the local server survives.
+                val activeSession = activeServer.openSession(context, state)
                 session = activeSession
                 val redirectUri = activeSession.redirectUri
 
@@ -118,6 +120,15 @@ class GeminiOAuthManager(
         loginJob?.cancel()
         loginJob = null
         _status.value = GeminiOAuthStatus.Idle
+    }
+
+    fun logout() {
+        loginJob?.cancel()
+        loginJob = null
+        scope.launch {
+            repository.accounts.value.toList().forEach { repository.delete(it.id) }
+            _status.value = GeminiOAuthStatus.Idle
+        }
     }
 
     fun consumeResult() {

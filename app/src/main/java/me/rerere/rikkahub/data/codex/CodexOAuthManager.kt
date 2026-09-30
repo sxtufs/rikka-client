@@ -50,7 +50,10 @@ class CodexOAuthManager(
                             callbackPath = CALLBACK_PATH,
                             redirectHost = "localhost",
                         )
-                        val candidateSession = candidateServer.openSession(state)
+                        // Keep the loopback server alive while the browser is in the
+                        // foreground. Without the foreground-service-aware overload Android may
+                        // kill the process before OpenAI redirects back.
+                        val candidateSession = candidateServer.openSession(context, state)
                         callbackServer = candidateServer
                         session = candidateSession
                         break
@@ -130,6 +133,15 @@ class CodexOAuthManager(
         _status.value = CodexOAuthStatus.Idle
     }
 
+    fun logout() {
+        loginJob?.cancel()
+        loginJob = null
+        scope.launch {
+            repository.accounts.value.toList().forEach { repository.delete(it.id) }
+            _status.value = CodexOAuthStatus.Idle
+        }
+    }
+
     fun consumeResult() {
         _status.value = CodexOAuthStatus.Idle
     }
@@ -140,7 +152,9 @@ class CodexOAuthManager(
         const val TOKEN_URL = "https://auth.openai.com/oauth/token"
         const val DEFAULT_SCOPES = "openid profile email offline_access"
         const val REFRESH_SCOPES = DEFAULT_SCOPES
-        private val CALLBACK_PORTS = listOf(1455, 1457)
+        // OpenAI's public Codex client is registered for this exact loopback port. Do not
+        // silently fall back to another port: the OAuth server rejects an unregistered redirect.
+        private val CALLBACK_PORTS = listOf(1455)
         private const val CALLBACK_PATH = "/auth/callback"
     }
 

@@ -52,7 +52,7 @@ class GrokProvider(
             ).await()
             if (!response.isSuccessful) {
                 if (response.code == 401) repository.markInvalid(account.id)
-                error("Failed to get Grok models: ${response.code} ${response.body.string()}")
+                error("Failed to get Grok models (HTTP ${response.code})")
             }
             val data = json.parseToJsonElement(response.body.string()).jsonObject["data"]?.jsonArray
                 ?: return@withContext emptyList()
@@ -123,7 +123,7 @@ class GrokProvider(
             val bodyStr = response.body.string()
             if (!response.isSuccessful) {
                 if (response.code == 401) repository.markInvalid(account.id)
-                error("Failed to generate image: ${response.code} $bodyStr")
+                error("Failed to generate image (HTTP ${response.code})")
             }
             parseGrokImageResponse(bodyStr)
         }

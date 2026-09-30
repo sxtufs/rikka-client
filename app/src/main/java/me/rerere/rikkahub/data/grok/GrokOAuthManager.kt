@@ -68,6 +68,15 @@ class GrokOAuthManager(
         _status.value = GrokOAuthStatus.Idle
     }
 
+    fun logout() {
+        pollJob?.cancel()
+        pollJob = null
+        scope.launch {
+            repository.accounts.value.toList().forEach { repository.delete(it.id) }
+            _status.value = GrokOAuthStatus.Idle
+        }
+    }
+
     fun consumeResult() {
         _status.value = GrokOAuthStatus.Idle
     }
@@ -82,16 +91,25 @@ class GrokOAuthManager(
                 .build()
         ).await()
         val body = response.body.string()
-        if (!response.isSuccessful) error("Device authorization failed: ${response.code} $body")
+        if (!response.isSuccessful) error("Device authorization failed (HTTP ${response.code})")
         val obj = json.parseToJsonElement(body).jsonObject
         fun str(key: String) = obj[key]?.jsonPrimitive?.contentOrNull
+        val verificationUri = requireHttpsUrl(
+            str("verification_uri")
+                ?: str("verification_uri_complete")
+                ?: error("Missing verification_uri")
+        )
+        val verificationUriComplete = str("verification_uri_complete")?.let(::requireHttpsUrl)
+            ?.also { complete ->
+                require(Uri.parse(complete).host.equals(Uri.parse(verificationUri).host, ignoreCase = true)) {
+                    "xAI returned an unexpected verification host"
+                }
+            }
         DeviceAuthorization(
             deviceCode = str("device_code") ?: error("Missing device_code"),
             userCode = str("user_code") ?: error("Missing user_code"),
-            verificationUri = str("verification_uri")
-                ?: str("verification_uri_complete")
-                ?: error("Missing verification_uri"),
-            verificationUriComplete = str("verification_uri_complete"),
+            verificationUri = verificationUri,
+            verificationUriComplete = verificationUriComplete,
             intervalSeconds = (obj["interval"]?.jsonPrimitive?.intOrNull ?: 5).coerceAtLeast(1),
             expiresAtMillis = System.currentTimeMillis() +
                 (obj["expires_in"]?.jsonPrimitive?.intOrNull ?: 600) * 1000L,
@@ -135,13 +153,20 @@ class GrokOAuthManager(
     }
 
     private fun openBrowser(url: String) {
-        runCatching {
-            context.startActivity(
-                Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-            )
+        val safeUrl = requireHttpsUrl(url)
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(safeUrl)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        )
+    }
+
+    private fun requireHttpsUrl(raw: String): String {
+        val uri = Uri.parse(raw)
+        require(uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()) {
+            "xAI returned an invalid verification URL"
         }
+        return uri.toString()
     }
 
     companion object {

@@ -1,31 +1,41 @@
 # OAuth Provider Tasks
 
-## Phase 1: Foundation
-- [ ] Add `Codex`, `Grok`, and `GeminiOAuth` provider settings and provider-manager dispatch.
-  - Acceptance: settings serialize with stable discriminators and `getProviderByType` resolves all three.
-  - Verify: `./gradlew :ai:test` and compile checks.
-- [ ] Add stable built-in provider entries and app DI registration points.
-  - Acceptance: fresh settings contain disabled built-in entries and no credentials are stored in settings.
-  - Verify: settings/provider unit tests.
+> Source implementation has been rebuilt in the current working tree. The checklist remains open until Gradle tests/build/lint are run on a machine with the Android toolchain.
 
-## Phase 2: Authentication and providers
-- [ ] Implement Codex encrypted account store, OAuth manager, repository, provider transport, and callback handling.
-  - Acceptance: PKCE login, encrypted persistence, refresh, account rotation, model listing, and streaming work.
-  - Verify: mocked OAuth/HTTP/SSE tests.
-- [ ] Implement Grok encrypted account store, device OAuth, repository, and provider transport.
-  - Acceptance: device login, refresh, account rotation, model listing, and streaming work.
-  - Verify: mocked OAuth/HTTP/SSE tests.
-- [ ] Implement Gemini Code Assist/Antigravity account store, OAuth onboarding, repository, and streaming provider.
-  - Acceptance: sign-in provisions a project, model listing and streaming work, and the terms warning is visible.
-  - Verify: mocked onboarding/HTTP/SSE tests.
+## Phase 1 — Foundation
+- [ ] Replace the partial provider port with one coherent settings/manager contract.
+  - Acceptance: `codex`, `grok`, and `gemini_oauth` serialize stably; dispatch resolves only registered implementations; OAuth types cannot be converted to API-key providers.
+  - Verify: `./gradlew :ai:test`.
+- [ ] Make generic OAuth callback/PKCE primitives lifecycle-safe.
+  - Acceptance: state is checked, loopback callbacks are single-use, sessions can keep the callback foreground service alive, and token HTTP does not log secrets.
+  - Verify: `./gradlew :oauth:test`.
 
-## Phase 3: UI and hardening
-- [ ] Add provider-specific settings and account-management UI.
-  - Acceptance: sign-in, refresh, enable/disable, logout, and status/error states are usable.
-  - Verify: compile and manual settings walkthrough.
-- [ ] Add regression tests and documentation for privacy, terms risks, and unsupported account states.
-  - Acceptance: no secret-bearing logs/backups and all new behavior is covered.
-  - Verify: `./gradlew test && ./gradlew assembleDebug && ./gradlew lint`.
+## Phase 2 — Account/authentication
+- [ ] Rebuild Codex encrypted account repository and PKCE manager.
+  - Acceptance: authorization-code login, refresh-token rotation, encrypted persistence, account rotation, invalidation and usage parsing are covered.
+  - Verify: Codex repository/parser tests.
+- [ ] Rebuild Grok device-code account repository and manager.
+  - Acceptance: RFC 8628 polling handles pending/slow-down/expiry/denial, refresh preserves old refresh tokens, and token errors are sanitized.
+  - Verify: Grok OAuth/repository/parser tests.
+- [ ] Rebuild Gemini OAuth account repository and onboarding.
+  - Acceptance: Google OAuth uses loopback+PKCE, project discovery/onboarding is bounded, expired access tokens refresh, and missing-project errors are actionable.
+  - Verify: Gemini endpoint/account tests.
 
-## Checkpoint: Before provider implementation
-- [ ] Review foundation changes before adding network/auth implementations.
+## Phase 3 — Provider transport
+- [ ] Implement Codex Responses transport and model/usage discovery.
+  - Acceptance: official Codex URL/headers are fixed, request stream mode is forced, missing SSE media type is adapted only for the Codex client, and tool/reasoning mapping works.
+- [ ] Implement Grok Responses/image transport.
+  - Acceptance: OAuth bearer is used only for xAI endpoints, model/image responses parse safely, and partial SSE streams are not duplicated by retries.
+- [ ] Implement Gemini Code Assist model and wrapped SSE transport.
+  - Acceptance: `{project, model, request}` envelope, endpoint fallback/backoff, nested error parsing, and shared Gemini message conversion work.
+  - Verify: focused provider tests plus `./gradlew :app:test`.
+
+## Phase 4 — UI and hardening
+- [ ] Add usable sign-in/status/logout/refresh controls and preserve disabled/default-provider behavior.
+  - Acceptance: no credentials appear in provider settings or share/export payloads; login errors are visible without token data; Gemini terms warning is shown.
+- [ ] Run full verification and review the diff.
+  - Verify: `./gradlew test`, `./gradlew assembleDebug`, `./gradlew lint`.
+
+## Checkpoint
+- [ ] No implementation continues past a failing focused test or compile error.
+- [ ] Manual OAuth smoke tests are performed only after the local test/build gates pass.

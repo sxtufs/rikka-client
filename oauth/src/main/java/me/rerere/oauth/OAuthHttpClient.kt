@@ -151,7 +151,9 @@ class OAuthHttpClient(
             .add("client_id", request.clientId)
             .add("code_verifier", request.codeVerifier)
             .apply {
-                if (!request.clientSecret.isNullOrBlank()) add("client_secret", request.clientSecret)
+                request.clientSecret?.takeIf { it.isNotBlank() }?.let {
+                    add("client_secret", it)
+                }
                 request.resources.forEach { add("resource", it) }
                 request.additionalParameters.forEach { (name, value) -> add(name, value) }
             }
@@ -166,8 +168,12 @@ class OAuthHttpClient(
                 .add("refresh_token", request.refreshToken)
                 .add("client_id", request.clientId)
                 .apply {
-                    if (!request.clientSecret.isNullOrBlank()) add("client_secret", request.clientSecret)
-                    if (!request.scope.isNullOrBlank()) add("scope", request.scope)
+                    request.clientSecret?.takeIf { it.isNotBlank() }?.let {
+                        add("client_secret", it)
+                    }
+                    request.scope?.takeIf { it.isNotBlank() }?.let {
+                        add("scope", it)
+                    }
                     request.resources.forEach { add("resource", it) }
                     request.additionalParameters.forEach { (name, value) -> add(name, value) }
                 }
@@ -189,7 +195,9 @@ class OAuthHttpClient(
         executeRaw(request).use { response ->
             val body = response.body.string()
             if (!response.isSuccessful) {
-                throw IOException("HTTP ${response.code} for ${request.url}: ${body.take(300)}")
+                // OAuth error bodies are provider-controlled and may contain credential-shaped
+                // fields. Keep them out of UI/log exceptions; callers only need the status.
+                throw IOException("OAuth request failed (HTTP ${response.code})")
             }
             return body
         }

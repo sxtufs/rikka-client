@@ -23,4 +23,19 @@ class DefaultProvidersTest {
         assertEquals("/credits", provider.balanceOption.apiPath)
         assertEquals("balance", provider.balanceOption.resultPath)
     }
+
+    @Test
+    fun `default oauth providers are disabled and contain no credentials`() {
+        val oauthProviders = DEFAULT_PROVIDERS.filter {
+            it is ProviderSetting.Codex ||
+                it is ProviderSetting.Grok ||
+                it is ProviderSetting.GeminiOAuth
+        }
+
+        assertEquals(3, oauthProviders.size)
+        assertTrue(oauthProviders.all { !it.enabled && it.builtIn && it.models.isEmpty() })
+    }
+}
+        assertEquals("balance", provider.balanceOption.resultPath)
+    }
 }

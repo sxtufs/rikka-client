@@ -262,6 +262,15 @@ private fun ProviderConfigureOAuth(
             Button(onClick = manager::startLogin, modifier = Modifier.fillMaxWidth()) {
                 Text("Sign in with OpenAI")
             }
+            OutlinedButton(
+                onClick = {
+                    manager.logout()
+                    onEdit(provider.copyProvider(enabled = false, models = emptyList()))
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Sign out all OpenAI accounts")
+            }
             when (val currentStatus = status) {
                 CodexOAuthStatus.Idle -> Unit
                 CodexOAuthStatus.Waiting -> Text("Waiting for OpenAI authorization…")
@@ -274,6 +283,15 @@ private fun ProviderConfigureOAuth(
             val status by manager.status.collectAsStateWithLifecycle()
             Button(onClick = manager::startLogin, modifier = Modifier.fillMaxWidth()) {
                 Text("Sign in with xAI")
+            }
+            OutlinedButton(
+                onClick = {
+                    manager.logout()
+                    onEdit(provider.copyProvider(enabled = false, models = emptyList()))
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Sign out all xAI accounts")
             }
             when (val currentStatus = status) {
                 GrokOAuthStatus.Idle -> Unit
@@ -296,6 +314,15 @@ private fun ProviderConfigureOAuth(
             val status by manager.status.collectAsStateWithLifecycle()
             Button(onClick = manager::startLogin, modifier = Modifier.fillMaxWidth()) {
                 Text("Sign in with Google")
+            }
+            OutlinedButton(
+                onClick = {
+                    manager.logout()
+                    onEdit(provider.copyProvider(enabled = false, models = emptyList()))
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Sign out all Google accounts")
             }
             when (val currentStatus = status) {
                 GeminiOAuthStatus.Idle -> Unit

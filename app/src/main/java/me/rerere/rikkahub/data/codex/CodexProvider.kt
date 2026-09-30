@@ -56,7 +56,7 @@ class CodexProvider(
             ).await()
             if (!response.isSuccessful) {
                 if (response.code == 401) repository.markInvalid(account.id)
-                error("Failed to get Codex models: ${response.code} ${response.body.string()}")
+                error("Failed to get Codex models (HTTP ${response.code})")
             }
             val models = (json.parseToJsonElement(response.body.string()) as? JsonObject)
                 ?.get("models") as? JsonArray ?: return@withContext emptyList()

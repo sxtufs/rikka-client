@@ -70,17 +70,22 @@ class GeminiProvider(
 
     override suspend fun listModels(providerSetting: ProviderSetting.GeminiOAuth): List<Model> =
         withContext(Dispatchers.IO) {
-            val account = repository.acquireAccount()
+            val account = repository.ensureProject(repository.acquireAccount())
+            val project = account.projectId
+                ?: error("Gemini OAuth account has no Cloud Code project")
             val outcome = client.postWithEndpointFallback(GEMINI_GENERATE_ENDPOINTS, json) { endpoint ->
                 Request.Builder()
                     .url("$endpoint/v1internal:fetchAvailableModels")
                     .antigravityHeaders(account.accessToken)
-                    .post("{}".toRequestBody(JSON_MEDIA_TYPE))
+                    .post(
+                        json.encodeToString(buildJsonObject { put("project", project) })
+                            .toRequestBody(JSON_MEDIA_TYPE)
+                    )
                     .build()
             }
             if (!outcome.successful) {
                 if (outcome.code == 401) scope.launch { repository.markInvalid(account.id) }
-                error("Failed to list Gemini models: ${outcome.code} ${outcome.body}")
+                error("Failed to list Gemini models (HTTP ${outcome.code})")
             }
             mapAvailableModels(outcome.body, json)
         }
@@ -204,7 +209,23 @@ class GeminiProvider(
                         eventSource.cancel()
                     }
                 } catch (e: Exception) {
+                    // Do not leave the producer suspended forever if a provider sends malformed
+                    // JSON or an in-band error event. This attempt is not safe to retry after
+                    // output was emitted, and the outer loop will surface the original failure.
                     Log.w(TAG, "onEvent: failed to parse chunk", e)
+                    resumeOnce(
+                        GeminiStreamAttemptOutcome.Failure(
+                            cause = e,
+                            emitted = emitted,
+                            classification = GeminiErrorClassification(
+                                status = null,
+                                reason = "malformed_stream",
+                                retryDelayMs = null,
+                                retryable = false,
+                            ),
+                        )
+                    )
+                    eventSource.cancel()
                 }
             }
 
@@ -216,7 +237,7 @@ class GeminiProvider(
                 // Response's body can only be consumed once.
                 val bodyText = runCatching { response?.body?.string() }.getOrNull()
                 val cause = t ?: IllegalStateException(
-                    "Cloud Code Assist request failed: ${response?.code ?: "unknown"} ${bodyText.orEmpty()}")
+                    "Cloud Code Assist request failed (HTTP ${response?.code ?: "unknown"})")
                 resumeOnce(
                     GeminiStreamAttemptOutcome.Failure(
                         cause = cause,
@@ -267,13 +288,20 @@ internal sealed interface GeminiStreamAttemptOutcome {
 private fun mapAvailableModels(body: String, json: Json): List<Model> {
     val models = json.parseToJsonElement(body).jsonObject["models"]?.jsonObject
         ?: return emptyList()
-    return models.values.mapNotNull { element ->
+    return models.entries.mapNotNull { (catalogId, element) ->
         val item = element.jsonObject
-        val modelId = item["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+        // Different Cloud Code generations use `id`, `model`, `name`, or the map key for
+        // the stable model id. Prefer the explicit machine id and retain the key as a fallback.
+        val modelId = item["id"]?.jsonPrimitive?.contentOrNull
+            ?: item["model"]?.jsonPrimitive?.contentOrNull
+            ?: item["name"]?.jsonPrimitive?.contentOrNull
+            ?: catalogId
         if (item["isInternal"]?.jsonPrimitive?.contentOrNull == "true") return@mapNotNull null
         Model(
             modelId = modelId,
-            displayName = item["displayName"]?.jsonPrimitive?.contentOrNull ?: modelId,
+            displayName = item["displayName"]?.jsonPrimitive?.contentOrNull
+                ?: item["name"]?.jsonPrimitive?.contentOrNull
+                ?: modelId,
             inputModalities = listOf(Modality.TEXT),
             abilities = buildList {
                 add(ModelAbility.TOOL)
