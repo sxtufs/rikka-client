@@ -1484,4 +1484,11 @@
   <string name="accessibility_edit_model">Edit model</string>
   <string name="accessibility_edit_override">Edit override</string>
   <string name="accessibility_remove_override">Remove override</string>
+  <string name="setting_provider_delete_title">Remove provider?</string>
+  <string name="setting_provider_delete_body">This will permanently remove %1$s and all its configured models. You can re-add it later.</string>
+  <string name="setting_provider_delete_confirm">Remove</string>
+  <string name="setting_provider_delete_cancel">Cancel</string>
+  <string name="setting_provider_page_discount_badge">10% off</string>
+  <string name="accessibility_clear_text">Clear text</string>
+  <string name="accessibility_add_provider">Add provider</string>
 </resources>

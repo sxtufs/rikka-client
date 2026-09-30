@@ -249,13 +249,6 @@ fun SettingProviderPage(vm: SettingVM = koinViewModel()) {
                             vm.updateSettings(
                                 settings.copy(
                                     providers = settings.providers.filter { it.id != target.id },
-                                    // If the user removed a built-in default, remember the
-                                    // intent so the re-seed pass on settings load doesn't
-                                    // resurrect it. Without this gate the row just bobs to
-                                    // the bottom of the list on next reload.
-                                    deletedBuiltInProviderIds =
-                                        if (target.builtIn) settings.deletedBuiltInProviderIds + target.id
-                                        else settings.deletedBuiltInProviderIds,
                                 )
                             )
                             providerToDelete = null
