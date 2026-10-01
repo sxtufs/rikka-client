@@ -1398,6 +1398,7 @@
   <string name="chart_mode_table">جدول</string>
   <string name="chart_series">سلسلة</string>
   <string name="chart_series_name">سلسلة %1$d</string>
+<<<<<<< HEAD
   <string name="codex_oauth_ports_unavailable">تعذر بدء خادم استدعاء Codex OAuth. لا توجد منافذ متاحة.</string>
   <string name="common_delete_confirm_message">هل أنت متأكد من رغبتك في حذف "%s"؟ لا يمكن التراجع عن هذا الإجراء.</string>
   <string name="codex_provider_description">Uses the OpenAI Codex OAuth and Responses API flow. This integration depends on Codex service compatibility.</string>
@@ -1491,4 +1492,9 @@
   <string name="setting_provider_page_discount_badge">10% off</string>
   <string name="accessibility_clear_text">Clear text</string>
   <string name="accessibility_add_provider">Add provider</string>
+=======
+  <string name="error_fast_model_not_found">لم يتم العثور على النموذج السريع. يرجى اختيار واحد في الإعدادات.</string>
+  <string name="error_fast_model_provider_not_found">لم يتم العثور على مزوّد النموذج السريع</string>
+  <string name="assistant_page_clone_with_memories">نسخ الذاكرة أيضًا</string>
+>>>>>>> upstream/master
 </resources>
