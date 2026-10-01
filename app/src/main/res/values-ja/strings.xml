@@ -1400,7 +1400,6 @@ mDNSアドレス: .localホスト名を使用し、IPを知らなくても同じ
   <string name="chart_mode_table">表</string>
   <string name="chart_series">系列</string>
   <string name="chart_series_name">系列 %1$d</string>
-<<<<<<< HEAD
   <string name="codex_oauth_ports_unavailable">Codex OAuth コールバックサーバーを起動できません。利用可能なポートがありません。</string>
   <string name="common_delete_confirm_message">「%s」を削除してもよろしいですか？この操作は取り消せません。</string>
   <string name="codex_provider_description">Uses the OpenAI Codex OAuth and Responses API flow. This integration depends on Codex service compatibility.</string>
@@ -1494,9 +1493,7 @@ mDNSアドレス: .localホスト名を使用し、IPを知らなくても同じ
   <string name="setting_provider_page_discount_badge">10% off</string>
   <string name="accessibility_clear_text">Clear text</string>
   <string name="accessibility_add_provider">Add provider</string>
-=======
   <string name="error_fast_model_not_found">高速モデルが見つかりません。設定で選択してください。</string>
   <string name="error_fast_model_provider_not_found">高速モデルのプロバイダーが見つかりません</string>
   <string name="assistant_page_clone_with_memories">記憶もコピー</string>
->>>>>>> upstream/master
 </resources>

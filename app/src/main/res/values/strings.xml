@@ -1401,7 +1401,6 @@
   <string name="chart_mode_table">Table</string>
   <string name="chart_series">Series</string>
   <string name="chart_series_name">Series %1$d</string>
-<<<<<<< HEAD
   <string name="codex_provider_description">Uses the OpenAI Codex OAuth and Responses API flow. This integration depends on Codex service compatibility.</string>
   <string name="codex_sign_in">Sign in with OpenAI OAuth</string>
   <string name="codex_enable">Enable Codex</string>
@@ -1493,9 +1492,7 @@
   <string name="setting_provider_page_discount_badge">10% off</string>
   <string name="accessibility_clear_text">Clear text</string>
   <string name="accessibility_add_provider">Add provider</string>
-=======
   <string name="error_fast_model_not_found">Fast model not found. Please select one in settings.</string>
   <string name="error_fast_model_provider_not_found">Provider of the fast model not found</string>
   <string name="assistant_page_clone_with_memories">Also copy memories</string>
->>>>>>> upstream/master
 </resources>
