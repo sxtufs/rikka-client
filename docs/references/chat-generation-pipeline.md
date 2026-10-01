@@ -8,7 +8,7 @@
 |----------------------------|-----------------------------|
 | `ChatService`              | 入口与编排层，管理所有会话，对外暴露操作接口      |
 | `ConversationSession`      | 单个会话的状态容器（引用计数、生成 Job、处理状态） |
-| `GenerationHandler`        | 核心生成逻辑，驱动 Step 循环与工具调用      |
+| `GenerationLoop`        | 核心生成逻辑，驱动 Step 循环与工具调用      |
 | `InputMessageTransformer`  | 发送给 API 前对消息列表的变换管道         |
 | `OutputMessageTransformer` | 接收到流式 chunk 后对消息列表的变换管道     |
 
@@ -28,7 +28,7 @@ ChatService.sendMessage()
     └── handleMessageComplete()
             │
             ▼
-        GenerationHandler.generateText()   ← Flow<GenerationChunk>
+        GenerationLoop.generateText()   ← Flow<GenerationChunk>
             │  (最多 maxSteps=256 轮循环)
             │
             ├─ [若无待处理 Tool] generateInternal()
@@ -151,7 +151,7 @@ onSuccess
 4. **Workspace Tools**（`createWorkspaceToolsIfReady`）— Workspace Shell 就绪时注入，含 `workspace_shell`
 5. **Skill Tools**（`createSkillTools`）— 助手启用的 Skill 列表
 6. **MCP Tools** — 所有已连接 MCP 服务器的工具，命名格式 `mcp__{serverName}__{toolName}`
-7. **Memory Tools**（`buildMemoryTools`，内置于 GenerationHandler）— `enableMemory = true` 时，支持记忆的增删改
+7. **Memory Tools**（`buildMemoryTools`，内置于 GenerationLoop）— `enableMemory = true` 时，支持记忆的增删改
 
 ### 工具审批状态机
 
@@ -164,7 +164,7 @@ Pending ──── 用户操作 ────► Approved → 执行工具
                        ──► Answered → 使用用户提供的文本作为结果
 ```
 
-审批流程由 `ChatService.handleToolApproval()` 触发，更新状态后重新调用 `handleMessageComplete()`，`GenerationHandler` 检测到
+审批流程由 `ChatService.handleToolApproval()` 触发，更新状态后重新调用 `handleMessageComplete()`，`GenerationLoop` 检测到
 `canResumeExecution` 的 Tool 后直接跳过本轮生成，进入工具执行阶段。
 
 ### 工具输出截断
@@ -210,7 +210,7 @@ app/src/main/java/me/rerere/rikkahub/
 │   ├── ChatService.kt              # 编排入口
 │   └── ConversationSession.kt      # 会话状态容器
 └── data/ai/
-    ├── GenerationHandler.kt        # 核心生成逻辑
+    ├── GenerationLoop.kt        # 核心生成逻辑
     ├── transformers/
     │   ├── Transformer.kt          # 接口定义与扩展函数
     │   ├── PromptInjectionTransformer.kt

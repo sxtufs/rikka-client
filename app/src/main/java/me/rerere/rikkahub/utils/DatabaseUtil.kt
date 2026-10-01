@@ -1,11 +1,13 @@
 package me.rerere.rikkahub.utils
 
+import android.annotation.SuppressLint
 import android.database.CursorWindow
 import android.util.Log
 
 private const val TAG = "DatabaseUtil"
 
 object DatabaseUtil {
+    @SuppressLint("DiscouragedPrivateApi")
     fun setCursorWindowSize(size: Int) {
         try {
             val field = CursorWindow::class.java.getDeclaredField("sCursorWindowSize")

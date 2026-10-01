@@ -41,6 +41,7 @@ object NotificationUtil {
     /**
      * 检查是否有通知权限
      */
+    @SuppressLint("InlinedApi")
     fun hasNotificationPermission(context: Context): Boolean {
         return ActivityCompat.checkSelfPermission(
             context,
