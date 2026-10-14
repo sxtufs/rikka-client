@@ -262,11 +262,11 @@ fun SettingProviderPage(vm: SettingVM = koinViewModel()) {
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            vm.updateSettings(
-                                settings.copy(
-                                    providers = settings.providers.filter { it.id != target.id },
+                            vm.updateSettings { latest ->
+                                latest.copy(
+                                    providers = latest.providers.filter { it.id != target.id },
                                 )
-                            )
+                            }
                             providerToDelete = null
                         }
                     ) {
