@@ -19,10 +19,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -57,7 +59,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalFocusManager
@@ -71,17 +75,8 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
-import com.dokar.sonner.ToastType
-import dev.chrisbanes.haze.HazeInput
+import me.rerere.ui.toast.ToastType
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.blur.HazeBlurStyle
-import dev.chrisbanes.haze.blur.hazeBlur
-import dev.chrisbanes.haze.blur.material3.Material3
-import dev.chrisbanes.haze.glass.GlassDefaults
-import dev.chrisbanes.haze.glass.GlassStyle
-import dev.chrisbanes.haze.glass.OpticalSizeValue
-import dev.chrisbanes.haze.glass.hazeGlass
-import dev.chrisbanes.haze.glass.material3.Material3
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collectLatest
 import me.rerere.ai.provider.Model
@@ -96,10 +91,7 @@ import me.rerere.hugeicons.stroke.Cancel01
 import me.rerere.hugeicons.stroke.Fullscreen
 import me.rerere.hugeicons.stroke.Zap
 import me.rerere.rikkahub.R
-import me.rerere.rikkahub.data.datastore.BackgroundEffectType
 import me.rerere.rikkahub.data.datastore.Settings
-import me.rerere.rikkahub.data.datastore.getCurrentAssistant
-import me.rerere.rikkahub.data.datastore.getCurrentChatModel
 import me.rerere.rikkahub.data.datastore.getQuickMessagesOfAssistant
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.Assistant
@@ -130,8 +122,10 @@ fun ChatInput(
     state: ChatInputState,
     loading: Boolean,
     settings: Settings,
+    // 会话视角下的助手和模型：会话开始后以会话上固定的配置为准
+    assistant: Assistant,
+    chatModel: Model?,
     hazeState: HazeState,
-    enableSearch: Boolean,
     onUpdateSearchMode: (SearchMode) -> Unit,
     modifier: Modifier = Modifier,
     completionProviders: List<ChatCompletionProvider> = emptyList(),
@@ -152,11 +146,7 @@ fun ChatInput(
     onStopVoiceMode: () -> Unit = {},
 ) {
     val toaster = LocalToaster.current
-    val assistant = settings.getCurrentAssistant()
-    val hazeTintColor = MaterialTheme.colorScheme.surfaceContainerLow
-    val inputHazeStyle = HazeBlurStyle.Material3 {
-        blurRadius(12.dp)
-    }
+    val containerColor = MaterialTheme.colorScheme.surfaceContainerLow
 
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -169,7 +159,7 @@ fun ChatInput(
         bottomStart = themeShape.bottomStart,
     )
     val modelListState = rememberModelListState(
-        modelId = assistant.chatModelId ?: settings.chatModelId,
+        modelId = chatModel?.id,
         providers = settings.providers,
         type = ModelType.CHAT,
     )
@@ -217,8 +207,19 @@ fun ChatInput(
         }
     }
 
+    // 底部渐变遮罩：从输入区顶部一直过渡到屏幕底部（键盘弹出时到键盘上沿），避免消息透到系统导航栏
+    val scrimColor = MaterialTheme.colorScheme.background
+    val imeInsets = WindowInsets.ime
     Surface(
         color = Color.Transparent,
+        modifier = Modifier.drawWithCache {
+            val brush = Brush.verticalGradient(
+                colors = listOf(scrimColor.copy(alpha = 0f), scrimColor),
+                startY = 0f,
+                endY = (size.height - imeInsets.getBottom(this)).coerceAtLeast(1f),
+            )
+            onDrawBehind { drawRect(brush) }
+        },
     ) {
         Column(
             modifier = modifier
@@ -239,34 +240,16 @@ fun ChatInput(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(containerShape)
-                    .then(
-                        if (settings.displaySetting.enableBlurEffect) {
-                            when (settings.displaySetting.backgroundEffectType) {
-                                BackgroundEffectType.BLUR -> Modifier.hazeBlur(
-                                    input = HazeInput.Sources(hazeState),
-                                    style = inputHazeStyle,
-                                )
-                                BackgroundEffectType.GLASS -> Modifier.hazeGlass(
-                                    input = HazeInput.Sources(hazeState),
-                                    style = GlassStyle.Material3(
-                                        containerColor = hazeTintColor,
-                                        tint = hazeTintColor.copy(alpha = 0.3f),
-                                    ) {
-                                        // Keep background text from competing with the input text.
-                                        optics(GlassDefaults.optics.copy(
-                                            blurRadius = OpticalSizeValue.Fixed(16.dp),
-                                            depth = OpticalSizeValue.Fixed(0.5f),
-                                        ))
-                                        shape(containerShape)
-                                    },
-                                )
-                            }
-                        } else Modifier
+                    .chatInputHaze(
+                        hazeState = hazeState,
+                        displaySetting = settings.displaySetting,
+                        containerColor = containerColor,
+                        shape = containerShape,
                     ),
                 shape = containerShape,
                 tonalElevation = 0.dp,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                color = if (settings.displaySetting.enableBlurEffect) Color.Transparent else hazeTintColor,
+                color = if (settings.displaySetting.enableBlurEffect) Color.Transparent else containerColor,
             ) {
                 Column(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -288,6 +271,7 @@ fun ChatInput(
 
                     TextInputRow(
                         state = state,
+                        assistant = assistant,
                         completionProviders = completionProviders,
                         onSendMessage = { sendMessage() },
                     )
@@ -315,9 +299,8 @@ fun ChatInput(
                             // Search
                             val enableSearchMsg = stringResource(R.string.web_search_enabled)
                             val disableSearchMsg = stringResource(R.string.web_search_disabled)
-                            val chatModel = settings.getCurrentChatModel()
                             SearchPickerButton(
-                                enableSearch = enableSearch,
+                                enableSearch = assistant.enableWebSearch,
                                 settings = settings,
                                 onUpdateSearchMode = { mode ->
                                     onUpdateSearchMode(mode)
@@ -337,8 +320,7 @@ fun ChatInput(
                             )
 
                             // Reasoning
-                            val model = settings.getCurrentChatModel()
-                            if (model?.abilities?.contains(ModelAbility.REASONING) == true) {
+                            if (chatModel?.abilities?.contains(ModelAbility.REASONING) == true) {
                                 ReasoningButton(
                                     reasoningLevel = assistant.reasoningLevel,
                                     onUpdateReasoningLevel = {
@@ -482,12 +464,12 @@ private fun ActionIconButton(
 @Composable
 private fun TextInputRow(
     state: ChatInputState,
+    assistant: Assistant,
     completionProviders: List<ChatCompletionProvider>,
     onSendMessage: () -> Unit,
 ) {
     val settings = LocalSettings.current
     val filesManager: FilesManager = koinInject()
-    val assistant = settings.getCurrentAssistant()
     val quickMessages = remember(settings.quickMessages, assistant.quickMessageIds) {
         settings.getQuickMessagesOfAssistant(assistant)
     }

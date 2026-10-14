@@ -225,9 +225,6 @@ dependencies {
     implementation(libs.koin.compose)
     implementation(libs.koin.androidx.workmanager)
 
-    // jetbrains markdown parser
-    implementation(libs.jetbrains.markdown)
-
     // okhttp
     implementation(libs.okhttp)
     implementation(libs.okhttp.sse)
@@ -281,17 +278,17 @@ dependencies {
     implementation(libs.androidx.paging.runtime)
     implementation(libs.androidx.paging.compose)
 
+    // media3 (video playback)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
+
     // Apache Commons Text
     implementation(libs.commons.text)
-
-    // Toast (Sonner)
-    implementation(libs.sonner)
 
     // Reorderable (https://github.com/Calvin-LL/Reorderable/)
     implementation(libs.reorderable)
 
-    // lucide icons
-    implementation(libs.lucide.icons)
+    // icons
     implementation(libs.huge.icons)
 
     // image viewer
@@ -326,6 +323,7 @@ dependencies {
     implementation(project(":mediagen"))
     implementation(project(":common"))
     implementation(project(":material3"))
+    implementation(project(":ui"))
     implementation(project(":workspace"))
     implementation(project(":oauth"))
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar", "*.aar"))))
@@ -336,6 +334,7 @@ dependencies {
 
     // tests
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

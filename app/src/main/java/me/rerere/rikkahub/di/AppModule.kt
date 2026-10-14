@@ -10,6 +10,7 @@ import me.rerere.rikkahub.data.ai.tools.ChatToolFactory
 import me.rerere.rikkahub.data.event.AppEventBus
 import me.rerere.rikkahub.service.ChatNotificationManager
 import me.rerere.rikkahub.service.ChatService
+import me.rerere.rikkahub.service.MediaCreationService
 import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceTerminalSessionManager
 import me.rerere.rikkahub.utils.EmojiData
 import me.rerere.rikkahub.utils.EmojiUtils
@@ -79,7 +80,6 @@ val appModule = module {
 
     single {
         ChatToolFactory(
-            json = get(),
             memoryRepository = get(),
             conversationRepository = get(),
             localTools = get(),
@@ -98,6 +98,7 @@ val appModule = module {
             conversationRepo = get(),
             memoryRepository = get(),
             generationLoop = get(),
+            memoryConsolidationScheduler = get(),
             translationHandler = get(),
             templateTransformer = get(),
             providerManager = get(),
@@ -106,6 +107,18 @@ val appModule = module {
             filesManager = get(),
             workspaceRepository = get(),
             folderRepository = get()
+        )
+    }
+
+    single {
+        MediaCreationService(
+            context = get(),
+            appScope = get(),
+            settingsStore = get(),
+            repository = get(),
+            manager = get(),
+            remoteFileStore = get(),
+            okHttpClient = get(),
         )
     }
 
