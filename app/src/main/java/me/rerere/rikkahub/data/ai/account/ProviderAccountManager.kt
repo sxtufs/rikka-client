@@ -78,7 +78,6 @@ class ProviderAccountManager(
             try {
                 val credential = when (provider) {
                     is ProviderSetting.ChatGPT -> loginChatGPT(context.applicationContext)
-                    is ProviderSetting.Grok -> loginGrok(providerId, context.applicationContext)
                 }
                 persistCredential(providerId, credential)
                 setStatus(providerId, null)
@@ -142,11 +141,6 @@ class ProviderAccountManager(
                 when (latest) {
                     is ProviderSetting.ChatGPT -> ChatGPTAuth.toCredential(
                         token = oauthClient.refreshToken(ChatGPTAuth.refreshRequest(refreshToken)),
-                        previous = credential,
-                    )
-
-                    is ProviderSetting.Grok -> GrokAuth.toCredential(
-                        token = oauthClient.refreshToken(GrokAuth.refreshRequest(refreshToken)),
                         previous = credential,
                     )
                 }

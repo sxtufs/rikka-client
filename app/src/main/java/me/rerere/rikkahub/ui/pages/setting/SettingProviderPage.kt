@@ -601,7 +601,9 @@ private fun AddButton(onAdd: (ProviderSetting) -> Unit) {
             ProviderSetting.Google(),
             ProviderSetting.Claude(),
             ProviderSetting.ChatGPT(),
+            ProviderSetting.Codex(),
             ProviderSetting.Grok(),
+            ProviderSetting.GeminiOAuth(),
         )
     }
 

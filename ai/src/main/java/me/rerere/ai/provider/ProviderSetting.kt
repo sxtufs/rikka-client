@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlin.reflect.KClass
 import kotlin.uuid.Uuid
 
 /** 账号登录得到的 OAuth 凭据 */
@@ -388,7 +389,7 @@ sealed class ProviderSetting {
     }
 
     companion object {
-        val Types by lazy {
+        val Types: List<KClass<out ProviderSetting>> by lazy {
             listOf(
                 OpenAI::class,
                 Google::class,

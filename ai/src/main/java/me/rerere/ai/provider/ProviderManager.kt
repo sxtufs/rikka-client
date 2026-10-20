@@ -62,6 +62,7 @@ class ProviderManager(
             is ProviderSetting.Codex -> getProvider("codex")
             is ProviderSetting.Grok -> getProvider("grok")
             is ProviderSetting.GeminiOAuth -> getProvider("gemini_oauth")
+            else -> error("Unsupported provider type: ${setting::class.qualifiedName}")
         } as Provider<T>
     }
 }
