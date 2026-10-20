@@ -1731,4 +1731,12 @@ mDNSアドレス: .localホスト名を使用し、IPを知らなくても同じ
   <string name="chat_page_compress_keep_recent">最近のメッセージを保持</string>
   <string name="chat_page_compress_keep_recent_desc">これらのメッセージは圧縮されず、要約の後にそのまま保持されます。すべてのメッセージを圧縮するには 0 を入力してください。</string>
   <string name="chat_page_compress_not_enough_messages">圧縮できるメッセージが足りません。保持するメッセージ数を減らしてください。</string>
+  <string name="setting_provider_page_usage_limit">使用量上限</string>
+  <string name="setting_provider_page_usage_limit_weekly">週間上限</string>
+  <string name="setting_provider_page_usage_limit_weeks">%1$d週間の上限</string>
+  <string name="setting_provider_page_usage_limit_daily">1日の上限</string>
+  <string name="setting_provider_page_usage_limit_days">%1$d日間の上限</string>
+  <string name="setting_provider_page_usage_limit_hours">%1$d時間の上限</string>
+  <string name="setting_provider_page_usage_limit_minutes">%1$d分間の上限</string>
+  <string name="setting_provider_page_quota_variables">変数: %1$s。このURLに上記のヘッダーとともにAPIキーが送信されます。</string>
 </resources>

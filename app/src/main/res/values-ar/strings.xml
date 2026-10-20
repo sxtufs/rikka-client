@@ -1729,4 +1729,12 @@
   <string name="chat_page_compress_keep_recent">الاحتفاظ بأحدث الرسائل</string>
   <string name="chat_page_compress_keep_recent_desc">لا تشارك هذه الرسائل في الضغط وتبقى كما هي بعد الملخص. استخدم 0 لضغط جميع الرسائل.</string>
   <string name="chat_page_compress_not_enough_messages">لا توجد رسائل كافية للضغط، قلّل عدد الرسائل المحتفظ بها.</string>
+  <string name="setting_provider_page_usage_limit">حد الاستخدام</string>
+  <string name="setting_provider_page_usage_limit_weekly">الحد الأسبوعي</string>
+  <string name="setting_provider_page_usage_limit_weeks">حد %1$d أسابيع</string>
+  <string name="setting_provider_page_usage_limit_daily">الحد اليومي</string>
+  <string name="setting_provider_page_usage_limit_days">حد %1$d أيام</string>
+  <string name="setting_provider_page_usage_limit_hours">حد %1$d ساعات</string>
+  <string name="setting_provider_page_usage_limit_minutes">حد %1$d دقيقة</string>
+  <string name="setting_provider_page_quota_variables">المتغيرات: %1$s. سيتم إرسال مفتاح API إلى هذا الرابط مع الرؤوس أعلاه.</string>
 </resources>

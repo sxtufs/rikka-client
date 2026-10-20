@@ -1726,4 +1726,12 @@
   <string name="image_preview_saved">圖片已儲存</string>
   <string name="setting_provider_page_grok_disclaimer">以 Grok CLI 的方式登入，使用你的 SuperGrok 訂閱。實驗性功能：xAI 可能隨時變更或限制此功能。</string>
   <string name="setting_provider_page_balance_api_path">餘額 API 路徑</string>
+  <string name="setting_provider_page_usage_limit">用量限制</string>
+  <string name="setting_provider_page_usage_limit_weekly">每週上限</string>
+  <string name="setting_provider_page_usage_limit_weeks">%1$d 週上限</string>
+  <string name="setting_provider_page_usage_limit_daily">每日上限</string>
+  <string name="setting_provider_page_usage_limit_days">%1$d 天上限</string>
+  <string name="setting_provider_page_usage_limit_hours">%1$d 小時上限</string>
+  <string name="setting_provider_page_usage_limit_minutes">%1$d 分鐘上限</string>
+  <string name="setting_provider_page_quota_variables">變數：%1$s。API 金鑰會連同上述標頭一併傳送至這個網址。</string>
 </resources>

@@ -1731,4 +1731,12 @@ mDNS 地址：使用 .local 主机名，同一网络中的其他设备可通过�
   <string name="image_preview_saved">图片已保存</string>
   <string name="setting_provider_page_grok_disclaimer">以 Grok CLI 的方式登录，使用你的 SuperGrok 订阅。实验性功能：xAI 可能随时更改或限制此功能。</string>
   <string name="setting_provider_page_balance_api_path">余额 API 路径</string>
+  <string name="setting_provider_page_usage_limit">用量限制</string>
+  <string name="setting_provider_page_usage_limit_weekly">每周限制</string>
+  <string name="setting_provider_page_usage_limit_weeks">%1$d 周限制</string>
+  <string name="setting_provider_page_usage_limit_daily">每日限制</string>
+  <string name="setting_provider_page_usage_limit_days">%1$d 天限制</string>
+  <string name="setting_provider_page_usage_limit_hours">%1$d 小时限制</string>
+  <string name="setting_provider_page_usage_limit_minutes">%1$d 分钟限制</string>
+  <string name="setting_provider_page_quota_variables">变量：%1$s。API 密钥将随上述请求头发送到此 URL。</string>
 </resources>

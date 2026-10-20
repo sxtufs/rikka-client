@@ -1731,4 +1731,12 @@
   <string name="chat_page_compress_keep_recent">Оставить последние сообщения</string>
   <string name="chat_page_compress_keep_recent_desc">Эти сообщения не участвуют в сжатии и сохраняются после сводки без изменений. Укажите 0, чтобы сжать все сообщения.</string>
   <string name="chat_page_compress_not_enough_messages">Недостаточно сообщений для сжатия. Уменьшите количество сохраняемых сообщений.</string>
+  <string name="setting_provider_page_usage_limit">Лимит использования</string>
+  <string name="setting_provider_page_usage_limit_weekly">Недельный лимит</string>
+  <string name="setting_provider_page_usage_limit_weeks">Лимит на %1$d нед.</string>
+  <string name="setting_provider_page_usage_limit_daily">Дневной лимит</string>
+  <string name="setting_provider_page_usage_limit_days">Лимит на %1$d дн.</string>
+  <string name="setting_provider_page_usage_limit_hours">Лимит на %1$d ч.</string>
+  <string name="setting_provider_page_usage_limit_minutes">Лимит на %1$d мин.</string>
+  <string name="setting_provider_page_quota_variables">Переменные: %1$s. Ключ API отправляется на этот URL с указанными выше заголовками.</string>
 </resources>
