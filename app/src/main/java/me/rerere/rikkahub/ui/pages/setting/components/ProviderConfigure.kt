@@ -161,6 +161,7 @@ internal fun ProviderSetting.resetBaseUrlToDefault(): ProviderSetting = when (th
     is ProviderSetting.OpenAI -> copy(baseUrl = defaultBaseUrlForReset())
     is ProviderSetting.Google -> copy(baseUrl = defaultBaseUrlForReset())
     is ProviderSetting.Claude -> copy(baseUrl = defaultBaseUrlForReset())
+    is ProviderSetting.ChatGPT -> this
     is ProviderSetting.Codex,
     is ProviderSetting.Grok,
     is ProviderSetting.GeminiOAuth -> this
