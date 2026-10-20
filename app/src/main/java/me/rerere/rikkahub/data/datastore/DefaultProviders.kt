@@ -5,7 +5,6 @@ import me.rerere.ai.provider.QuotaQuery
 import kotlin.uuid.Uuid
 
 val DEFAULT_AUTO_MODEL_ID = Uuid.parse("b7055fb4-39f9-4042-a88a-0d80ed76cf08")
-val DEFAULT_CHATGPT_PROVIDER_ID = Uuid.parse("4d4f0f7a-6d87-4b6c-9a2e-5c11f0a6d3e8")
 val DEFAULT_CODEX_PROVIDER_ID = Uuid.parse("7ce7e322-b995-4b0c-9d48-42e08dcfcdda")
 val DEFAULT_GROK_PROVIDER_ID = Uuid.parse("8f3e1d20-4b6a-4c9e-a1f2-9d5c7e0b3a44")
 val DEFAULT_GEMINI_OAUTH_PROVIDER_ID = Uuid.parse("2b6c1f84-73ad-4e35-b0c7-1a9e4d5f8c21")
@@ -17,12 +16,6 @@ val DEFAULT_PROVIDERS = listOf(
         baseUrl = "https://api.openai.com/v1",
         apiKey = "",
         builtIn = true
-    ),
-    ProviderSetting.ChatGPT(
-        id = DEFAULT_CHATGPT_PROVIDER_ID,
-        name = "ChatGPT",
-        enabled = false,
-        builtIn = true,
     ),
     ProviderSetting.Codex(
         id = DEFAULT_CODEX_PROVIDER_ID,

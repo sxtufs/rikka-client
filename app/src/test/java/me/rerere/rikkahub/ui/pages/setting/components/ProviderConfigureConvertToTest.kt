@@ -2,7 +2,6 @@ package me.rerere.rikkahub.ui.pages.setting.components
 
 import me.rerere.ai.provider.CustomHeader
 import me.rerere.ai.provider.Model
-import me.rerere.ai.provider.OAuthCredential
 import me.rerere.ai.provider.ProviderSetting
 import me.rerere.ai.provider.QuotaQuery
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -111,19 +110,5 @@ class ProviderConfigureConvertToTest {
 
         val converted = original.convertTo(ProviderSetting.OpenAI::class) as ProviderSetting.OpenAI
         assertEquals("not-a-url", converted.baseUrl)
-    }
-
-    @Test
-    fun `convertTo from account provider uses target default endpoint without credential`() {
-        val original = ProviderSetting.ChatGPT(
-            name = "ChatGPT",
-            credential = OAuthCredential(accessToken = "secret-access", refreshToken = "secret-refresh"),
-        )
-
-        val converted = original.convertTo(ProviderSetting.OpenAI::class) as ProviderSetting.OpenAI
-        assertEquals(original.id, converted.id)
-        assertEquals("", converted.apiKey)
-        assertEquals("https://api.openai.com/v1", converted.baseUrl)
-        assertEquals(ProviderSetting.OpenAI().quotaQuery, converted.quotaQuery)
     }
 }

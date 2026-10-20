@@ -57,7 +57,6 @@ data class QuotaQuery(
 val ProviderSetting.supportsQuota: Boolean
     get() = when (this) {
         is ProviderSetting.ApiKey -> quotaQuery.enabled
-        is ProviderSetting.Account -> credential != null
         is ProviderSetting.Codex -> false
         is ProviderSetting.Grok -> true
         is ProviderSetting.GeminiOAuth -> false

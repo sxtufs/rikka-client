@@ -113,10 +113,11 @@ fun SettingProviderPage(vm: SettingVM = koinViewModel()) {
     }
 
     val filteredProviders = remember(settings.providers, searchQuery) {
+        val visibleProviders = settings.providers.filterNot { it is ProviderSetting.ChatGPT }
         if (searchQuery.isBlank()) {
-            settings.providers
+            visibleProviders
         } else {
-            settings.providers.filter { provider ->
+            visibleProviders.filter { provider ->
                 provider.name.contains(searchQuery, ignoreCase = true)
             }
         }

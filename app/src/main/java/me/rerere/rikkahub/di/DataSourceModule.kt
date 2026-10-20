@@ -20,7 +20,6 @@ import me.rerere.rikkahub.data.ai.MemoryConsolidator
 import me.rerere.rikkahub.data.ai.RequestLoggingInterceptor
 import me.rerere.rikkahub.data.ai.TranslationHandler
 import me.rerere.rikkahub.data.ai.UsageRecorder
-import me.rerere.rikkahub.data.ai.account.ProviderAccountManager
 import me.rerere.rikkahub.data.codex.CodexAccountRepository
 import me.rerere.rikkahub.data.codex.CodexCredentialStore
 import me.rerere.rikkahub.data.codex.CodexOAuthManager
@@ -340,21 +339,12 @@ val dataSourceModule = module {
         SponsorAPI.create(get())
     }
 
-    single {
-        ProviderAccountManager(
-            settingsStore = get(),
-            appScope = get(),
-            client = get(),
-        )
-    }
-
     single<ProviderManager> {
         ProviderManager(
             client = get(),
             context = get(),
-            accountCredentials = get<ProviderAccountManager>(),
         ).also { manager ->
-            // Keep the custom multi-account OAuth integrations alongside upstream ChatGPT OAuth.
+            // Keep the custom multi-account OAuth integrations registered alongside API-key providers.
             manager.registerProvider(
                 "codex",
                 CodexProvider(

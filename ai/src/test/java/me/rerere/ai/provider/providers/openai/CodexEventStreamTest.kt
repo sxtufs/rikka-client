@@ -1,4 +1,4 @@
-package me.rerere.ai.provider.providers.chatgpt
+package me.rerere.ai.provider.providers.openai
 
 import me.rerere.ai.provider.providers.openai.ResponseApiStreamDecoder
 import me.rerere.ai.provider.stream.SseEvent
@@ -85,7 +85,7 @@ class CodexEventStreamTest {
         }
 
         client.newEventSource(
-            Request.Builder().url("$CODEX_BASE_URL/responses").build(),
+            Request.Builder().url("https://chatgpt.com/backend-api/codex/responses").build(),
             object : EventSourceListener() {
                 override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
                     collect(decoder.accept(SseEvent(id = id, event = type, data = data)).chunks)
