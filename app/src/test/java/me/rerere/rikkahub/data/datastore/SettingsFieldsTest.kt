@@ -161,7 +161,6 @@ private val SAMPLE = Settings(
     webServerAccessPassword = "secret",
     webServerLocalhostOnly = true,
     backupReminderConfig = BackupReminderConfig(enabled = true),
-    sponsorAlertDismissedAt = 7,
 )
 
 private val STORED_KEYS = setOf(
@@ -212,5 +211,4 @@ private val STORED_KEYS = setOf(
     "lorebooks",
     "quick_messages",
     "backup_reminder_config",
-    "sponsor_alert_dismissed_at",
 )
