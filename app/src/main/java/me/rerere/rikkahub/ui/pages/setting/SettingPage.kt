@@ -79,12 +79,13 @@ import me.rerere.rikkahub.utils.joinQQGroup
 import me.rerere.rikkahub.utils.openUrl
 import me.rerere.rikkahub.utils.plus
 import me.rerere.rikkahub.utils.writeClipboardText
+import org.koin.androidx.compose.koinViewModel
 import me.rerere.ui.icons.DiscordIcon
 import me.rerere.ui.icons.TencentQQIcon
 import org.koin.compose.koinInject
 
 @Composable
-fun SettingPage() {
+fun SettingPage(vm: SettingVM = koinViewModel()) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val navController = LocalNavController.current
     val settings by vm.settings.collectAsStateWithLifecycle()
