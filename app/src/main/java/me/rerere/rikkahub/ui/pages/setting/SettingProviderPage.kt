@@ -492,7 +492,6 @@ private fun AddButton(onAdd: (ProviderSetting) -> Unit) {
             ProviderSetting.OpenAI(),
             ProviderSetting.Google(),
             ProviderSetting.Claude(),
-            ProviderSetting.ChatGPT(),
             ProviderSetting.Codex(),
             ProviderSetting.Grok(),
             ProviderSetting.GeminiOAuth(),
