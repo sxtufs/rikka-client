@@ -1729,4 +1729,12 @@
   <string name="image_preview_saving">Saving…</string>
   <string name="image_preview_saved">Image saved</string>
   <string name="setting_provider_page_grok_disclaimer">Uses your SuperGrok subscription by signing in like the Grok CLI. Experimental: xAI may change or restrict this at any time.</string>
+  <string name="setting_provider_page_usage_limit">Usage limit</string>
+  <string name="setting_provider_page_usage_limit_weekly">Weekly limit</string>
+  <string name="setting_provider_page_usage_limit_weeks">%1$d week limit</string>
+  <string name="setting_provider_page_usage_limit_daily">Daily limit</string>
+  <string name="setting_provider_page_usage_limit_days">%1$d day limit</string>
+  <string name="setting_provider_page_usage_limit_hours">%1$d hour limit</string>
+  <string name="setting_provider_page_usage_limit_minutes">%1$d minute limit</string>
+  <string name="setting_provider_page_quota_variables">Variables: %1$s. The API key is sent to this URL with the headers above.</string>
 </resources>
