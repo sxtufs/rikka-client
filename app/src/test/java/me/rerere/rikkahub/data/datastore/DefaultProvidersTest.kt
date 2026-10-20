@@ -1,26 +1,43 @@
 package me.rerere.rikkahub.data.datastore
 
-import me.rerere.ai.provider.ProviderSetting
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DefaultProvidersTest {
     @Test
-    fun `default providers should include vercel ai gateway with expected balance config`() {
-        val vercelProviders = DEFAULT_PROVIDERS
-            .filterIsInstance<ProviderSetting.OpenAI>()
-            .filter { it.name == "Vercel AI Gateway" }
+    fun `default providers exclude removed third party gateways`() {
+        val removedNames = setOf(
+            "AiHubMix",
+            "APIMart",
+            "硅基流动",
+            "月之暗面",
+            "Vercel AI Gateway",
+            "阿里云百炼",
+            "火山引擎",
+            "智谱AI开放平台",
+            "阶跃星辰",
+            "302.AI",
+            "腾讯Hunyuan",
+            "随想AI网关",
+            "MaruCode",
+            "MiniMax",
+            "MIMO",
+        )
 
-        assertEquals(1, vercelProviders.size)
+        assertTrue(DEFAULT_PROVIDERS.none { it.name in removedNames })
+    }
 
-        val provider = vercelProviders.single()
-        assertEquals("https://ai-gateway.vercel.sh/v1", provider.baseUrl)
-        assertFalse(provider.enabled)
-        assertTrue(provider.builtIn)
-        assertTrue(provider.quotaQuery.enabled)
-        assertEquals("{{baseUrl}}/credits", provider.quotaQuery.url)
-        assertEquals("balance", provider.quotaQuery.resultPath)
+    @Test
+    fun `protected providers remain in default providers`() {
+        val names = DEFAULT_PROVIDERS.map { it.name }.toSet()
+
+        assertTrue("Codex" in names)
+        assertTrue("Gemini OAuth" in names)
+        assertTrue("Grok" in names)
+        assertTrue("DeepSeek" in names)
+        assertTrue("OpenRouter" in names)
+        assertEquals(1, DEFAULT_PROVIDERS.count { it.name == "DeepSeek" })
+        assertEquals(1, DEFAULT_PROVIDERS.count { it.name == "OpenRouter" })
     }
 }
