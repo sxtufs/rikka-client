@@ -188,17 +188,14 @@ internal fun ProviderSetting.ApiKey.defaultBaseUrlForReset(): String {
     }
 }
 
-internal fun ProviderSetting.resetBaseUrlToDefault(): ProviderSetting {
-    val defaultBaseUrl = defaultBaseUrlForReset()
-    return when (this) {
-        is ProviderSetting.OpenAI -> this.copy(baseUrl = defaultBaseUrl)
-        is ProviderSetting.Google -> this.copy(baseUrl = defaultBaseUrl)
-        is ProviderSetting.Claude -> this.copy(baseUrl = defaultBaseUrl)
-        is ProviderSetting.ChatGPT,
-        is ProviderSetting.Codex,
-        is ProviderSetting.Grok,
-        is ProviderSetting.GeminiOAuth -> this
-    }
+internal fun ProviderSetting.resetBaseUrlToDefault(): ProviderSetting = when (this) {
+    is ProviderSetting.OpenAI -> copy(baseUrl = defaultBaseUrlForReset())
+    is ProviderSetting.Google -> copy(baseUrl = defaultBaseUrlForReset())
+    is ProviderSetting.Claude -> copy(baseUrl = defaultBaseUrlForReset())
+    is ProviderSetting.ChatGPT,
+    is ProviderSetting.Codex,
+    is ProviderSetting.Grok,
+    is ProviderSetting.GeminiOAuth -> this
 }
 
 internal fun ProviderSetting.ApiKey.isUsingDefaultBaseUrl(): Boolean = baseUrl == defaultBaseUrlForReset()
