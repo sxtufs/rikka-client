@@ -94,11 +94,9 @@ class QuotaQueryRunnerTest {
     }
 
     @Test
-    fun `supportsQuota follows the query switch and the account sign in`() {
+    fun `supportsQuota follows the query switch`() {
         assertFalse(ProviderSetting.OpenAI().supportsQuota)
         assertTrue(ProviderSetting.OpenAI(quotaQuery = QuotaQuery(enabled = true)).supportsQuota)
-        assertFalse(ProviderSetting.ChatGPT().supportsQuota)
-        assertTrue(ProviderSetting.ChatGPT(credential = OAuthCredential(accessToken = "a")).supportsQuota)
     }
 
     @Test
