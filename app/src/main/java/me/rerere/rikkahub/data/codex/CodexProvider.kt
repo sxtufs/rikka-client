@@ -35,6 +35,7 @@ import me.rerere.ai.ui.StreamChunk
 import me.rerere.ai.ui.StreamChunkHandler
 import me.rerere.ai.ui.UIMessage
 import me.rerere.common.http.await
+import me.rerere.ai.util.json
 import me.rerere.rikkahub.AppScope
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
