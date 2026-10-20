@@ -792,6 +792,13 @@ internal data class ResponseProviderCapabilities(
 
 internal fun resolveResponseProviderCapabilities(host: String): ResponseProviderCapabilities {
     return when (host) {
+        "chatgpt.com" -> ResponseProviderCapabilities(
+            supportsReasoningSummary = false,
+            systemMessageRole = "developer",
+            supportsSamplingParams = false,
+            alwaysIncludeEncryptedContent = true,
+        )
+
         "ark.cn-beijing.volces.com" -> ResponseProviderCapabilities(
             supportsReasoningSummary = false,
             supportEncryptedContent = false

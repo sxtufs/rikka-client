@@ -61,40 +61,7 @@ class CodexProvider(
                 if (response.code == 401) repository.markInvalid(account.id)
                 error("Failed to get Codex models: ${response.code} ${response.body.string()}")
             }
-            val models = (json.parseToJsonElement(response.body.string()) as? JsonObject)
-                ?.get("models") as? JsonArray
-                ?: return@withContext emptyList()
-            models.mapNotNull { element ->
-                val item = element as? JsonObject ?: return@mapNotNull null
-                if (item["visibility"]?.jsonPrimitive?.contentOrNull != "list") {
-                    return@mapNotNull null
-                }
-                val slug = item["slug"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                val modalities = item["input_modalities"]?.jsonArray
-                    ?.mapNotNull { modality ->
-                        when ((modality as? JsonPrimitive)?.contentOrNull) {
-                            "text" -> Modality.TEXT
-                            "image" -> Modality.IMAGE
-                            else -> null
-                        }
-                    }
-                    ?.ifEmpty { listOf(Modality.TEXT) }
-                    ?: listOf(Modality.TEXT, Modality.IMAGE)
-                Model(
-                    modelId = slug,
-                    displayName = item["display_name"]?.jsonPrimitive?.contentOrNull ?: slug,
-                    inputModalities = modalities,
-                    abilities = buildList {
-                        add(ModelAbility.TOOL)
-                        if (
-                            item["supported_reasoning_levels"]?.jsonArray?.isNotEmpty() == true ||
-                            item["supports_reasoning_summaries"]?.jsonPrimitive?.booleanOrNull == true
-                        ) {
-                            add(ModelAbility.REASONING)
-                        }
-                    },
-                )
-            }
+            parseCodexModels(response.body.string())
         }
 
     override suspend fun generateText(
@@ -189,9 +156,10 @@ class CodexProvider(
                 reasoningEffort?.let { effort ->
                     CustomBody(
                         key = "reasoning",
+                        // ChatGPT Codex rejects reasoning.summary; encrypted reasoning content
+                        // is requested by the shared chatgpt.com ResponseAPI capabilities.
                         value = buildJsonObject {
                             put("effort", effort)
-                            put("summary", "auto")
                         },
                     )
                 },
@@ -237,7 +205,7 @@ class CodexProvider(
 
     private companion object {
         const val CODEX_API_BASE = "${CodexAccountRepository.CODEX_BASE_URL}/codex"
-        const val CLIENT_VERSION = "0.144.5"
+        const val CLIENT_VERSION = "0.163.0"
 
         // The Codex backend routes newer models (e.g. gpt-5.6-luna, which is gated on
         // minimal_client_version 0.144.0) by the codex version advertised in the User-Agent, not
@@ -248,6 +216,49 @@ class CodexProvider(
             "codex_cli_rs/$CLIENT_VERSION (Android ${Build.VERSION.RELEASE}; " +
                 "${Build.SUPPORTED_ABIS.firstOrNull() ?: "arm64"})"
         const val DEFAULT_INSTRUCTIONS = "You are a helpful assistant."
+    }
+}
+
+/**
+ * Parse the ChatGPT/Codex subscription catalog. The two subscription providers use the same
+ * `/backend-api/codex/models` contract; only models explicitly visible to the Codex client are
+ * admitted, so unrelated ChatGPT catalog entries are not guessed into the picker.
+ */
+internal fun parseCodexModels(body: String): List<Model> {
+    val models = (json.parseToJsonElement(body) as? JsonObject)
+        ?.get("models") as? JsonArray
+        ?: return emptyList()
+    // Only explicitly visible entries are admitted. Do not promote arbitrary ChatGPT catalog
+    // entries into the Codex picker merely because they appear in the response.
+    val visible = models
+        .filterIsInstance<JsonObject>()
+        .filter { it["visibility"]?.jsonPrimitive?.contentOrNull == "list" }
+    return visible.mapNotNull { model ->
+        val slug = model["slug"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+        val inputModalities = model["input_modalities"]?.jsonArray
+            ?.mapNotNull { modality ->
+                when ((modality as? JsonPrimitive)?.contentOrNull) {
+                    "text" -> Modality.TEXT
+                    "image" -> Modality.IMAGE
+                    else -> null
+                }
+            }
+            ?.ifEmpty { null }
+            ?: listOf(Modality.TEXT, Modality.IMAGE)
+        val reasoning = model["supported_reasoning_levels"]?.jsonArray?.isNotEmpty() == true ||
+            model["supports_reasoning_summaries"]?.jsonPrimitive?.booleanOrNull == true
+        Model(
+            modelId = slug,
+            displayName = model["display_name"]?.jsonPrimitive?.contentOrNull ?: slug,
+            inputModalities = inputModalities,
+            abilities = if (reasoning) {
+                listOf(ModelAbility.TOOL, ModelAbility.REASONING)
+            } else {
+                listOf(ModelAbility.TOOL)
+            },
+            contextLength = model["context_window"]?.jsonPrimitive?.contentOrNull?.toIntOrNull()
+                ?: Model().contextLength,
+        )
     }
 }
 

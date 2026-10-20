@@ -532,6 +532,23 @@ class ResponseApiRequestMessageTest {
         assertEquals("user", items.single().jsonObject["role"]?.jsonPrimitive?.content)
     }
 
+    @Test
+    fun `chatgpt codex endpoint uses developer messages and encrypted reasoning`() {
+        val setting = ProviderSetting.OpenAI(baseUrl = "https://chatgpt.com/backend-api/codex")
+        val capabilities = resolveResponseProviderCapabilities(setting.baseUrl.toHttpUrl().host)
+        val body = api.buildRequestBody(
+            capabilities = capabilities,
+            messages = listOf(UIMessage.system("system"), UIMessage.user("hello")),
+            params = createReasoningParams(ReasoningLevel.LOW),
+            stream = false,
+        )
+
+        assertFalse(body.containsKey("instructions"))
+        assertEquals("developer", body["input"]!!.jsonArray.first().jsonObject["role"]?.jsonPrimitive?.content)
+        assertFalse(body.containsKey("temperature"))
+        assertEquals("reasoning.encrypted_content", body["include"]!!.jsonArray.single().jsonPrimitive.content)
+    }
+
     // ==================== Helper Functions ====================
 
     private fun createToolParams(
