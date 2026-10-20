@@ -105,7 +105,10 @@ class ResponseAPI(
 
     private fun ProviderSetting.OpenAI.toResponsesEndpoint(params: TextGenerationParams) = ResponsesEndpoint(
         url = "$baseUrl$responsesPath",
-        capabilities = resolveResponseProviderCapabilities(baseUrl.toHttpUrl().host),
+        capabilities = resolveResponseProviderCapabilities(
+            host = baseUrl.toHttpUrl().host,
+            path = baseUrl.toHttpUrl().encodedPath,
+        ),
         configureRequest = {
             headers(mergeCustomHeaders(params.customHeaders))
             addHeader("Authorization", "Bearer ${keyRoulette.next(apiKey, id.toString())}")
@@ -790,10 +793,15 @@ internal data class ResponseProviderCapabilities(
     ) -> String? = { level, _ -> level.effort.takeIf { level != ReasoningLevel.AUTO } },
 )
 
-internal fun resolveResponseProviderCapabilities(host: String): ResponseProviderCapabilities {
+internal fun resolveResponseProviderCapabilities(
+    host: String,
+    path: String = "",
+): ResponseProviderCapabilities {
     return when (host) {
         "chatgpt.com" -> ResponseProviderCapabilities(
-            supportsReasoningSummary = false,
+            // Codex uses the ChatGPT host but supports visible reasoning summaries.
+            // Keep summaries disabled for the regular ChatGPT Responses endpoint.
+            supportsReasoningSummary = path.startsWith("/backend-api/codex"),
             systemMessageRole = "developer",
             supportsSamplingParams = false,
             alwaysIncludeEncryptedContent = true,
