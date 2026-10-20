@@ -1728,4 +1728,6 @@ mDNSアドレス: .localホスト名を使用し、IPを知らなくても同じ
   <string name="image_preview_saved">画像を保存しました</string>
   <string name="setting_provider_page_grok_disclaimer">Grok CLI と同様にサインインすることで、お使いの SuperGrok サブスクリプションを使用します。実験的機能: xAI はいつでもこれを変更または制限する可能性があります。</string>
   <string name="setting_provider_page_balance_api_path">残高 API パス</string>
+  <string name="chat_page_compress_keep_recent">最近のメッセージを保持</string>
+  <string name="chat_page_compress_keep_recent_desc">これらのメッセージは圧縮されず、要約の後にそのまま保持されます。すべてのメッセージを圧縮するには 0 を入力してください。</string>
 </resources>
