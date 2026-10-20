@@ -51,7 +51,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -85,14 +84,12 @@ import me.rerere.rikkahub.ui.components.ai.AssistantPicker
 import me.rerere.rikkahub.ui.components.ui.BackupReminderCard
 import me.rerere.rikkahub.ui.components.ui.Greeting
 import me.rerere.rikkahub.ui.components.ui.UIAvatar
-import me.rerere.rikkahub.ui.components.ui.UpdateCard
 import androidx.compose.ui.draw.clip
 import me.rerere.rikkahub.ui.context.LocalToaster
 import me.rerere.rikkahub.ui.context.Navigator
 import me.rerere.ui.toast.ToastType
 import me.rerere.rikkahub.ui.hooks.EditStateContent
 import me.rerere.rikkahub.ui.hooks.readBooleanPreference
-import me.rerere.rikkahub.ui.hooks.rememberIsPlayStoreVersion
 import me.rerere.rikkahub.ui.hooks.useEditState
 import me.rerere.rikkahub.ui.modifier.onClick
 import me.rerere.rikkahub.utils.navigateToChatPage
@@ -113,7 +110,6 @@ fun ChatDrawerContent(
     val context = LocalContext.current
     val toaster = LocalToaster.current
     val deletingFolderMessage = stringResource(R.string.chat_page_delete_folder_generating)
-    val isPlayStore = rememberIsPlayStoreVersion()
     val repo = koinInject<ConversationRepository>()
 
     val activity = context as ComponentActivity
@@ -170,21 +166,6 @@ fun ChatDrawerContent(
     // Menu popup 状态
     var showMenuPopup by remember { mutableStateOf(false) }
 
-    val updateCheckDisabledUntil = settings.displaySetting.updateCheckDisabledUntilEpochMillis
-    var updateChecksEnabled by remember(updateCheckDisabledUntil) {
-        mutableStateOf(updateCheckDisabledUntil <= System.currentTimeMillis())
-    }
-    LaunchedEffect(updateCheckDisabledUntil) {
-        while (true) {
-            val remaining = updateCheckDisabledUntil - System.currentTimeMillis()
-            if (remaining <= 0) {
-                updateChecksEnabled = true
-                break
-            }
-            updateChecksEnabled = false
-            delay(minOf(remaining, 60 * 60 * 1_000L))
-        }
-    }
 
     // 矮屏（如手表、横屏手机）上顶部固定会把会话列表挤没，改为跟随列表一起滚动
     val windowHeight = LocalWindowInfo.current.containerDpSize.height
@@ -196,10 +177,6 @@ fun ChatDrawerContent(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (updateChecksEnabled && !isPlayStore) {
-                UpdateCard(vm)
-            }
-
             BackupReminderCard(
                 settings = settings,
                 onClick = { navController.navigate(Screen.Backup) },

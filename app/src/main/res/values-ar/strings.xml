@@ -1,13 +1,10 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <resources>
-  <string name="about_page_github">Github</string>
-  <string name="about_page_license">الترخيص</string>
   <string name="about_page_system">النظام</string>
   <string name="about_page_title">حول</string>
   <string name="about_page_version">الإصدار</string>
-  <string name="about_page_website">الموقع الإلكتروني</string>
   <string name="add">إضافة</string>
-  <string name="app_name">RikkaHub</string>
+  <string name="app_name">RikkaDev</string>
   <string name="asr_button_content_description">التعرف على الكلام</string>
   <string name="asr_button_stop">إيقاف</string>
   <string name="assistant_detail_basic_desc">ضبط الاسم والصورة الرمزية والنموذج والمعلمات</string>
@@ -810,8 +807,6 @@
   <string name="setting_display_page_show_thinking_content_title">إظهار محتوى التفكير</string>
   <string name="setting_display_page_show_token_usage_desc">عرض استخدام Token وعدد الرسائل</string>
   <string name="setting_display_page_show_token_usage_title">إظهار إحصاءات Token والسياق</string>
-  <string name="setting_display_page_show_updates_desc">ما إذا كان سيتم عرض إشعارات تحديث التطبيق</string>
-  <string name="setting_display_page_show_updates_title">إظهار التحديثات</string>
   <string name="setting_display_page_show_user_avatar_desc">تحديد ما إذا كان سيتم عرض صورة المستخدم الرمزية في رسائل الدردشة</string>
   <string name="setting_display_page_show_user_avatar_title">إظهار صورة المستخدم الرمزية</string>
   <string name="setting_display_page_skip_crop_image_desc">تخطي واجهة الاقتصاص بعد استيراد الصور أو التقاطها</string>
@@ -964,7 +959,7 @@
   <string name="setting_page_preferences_network_user_agent">User-Agent</string>
   <string name="setting_page_preferences_network_user_agent_desc">اتركه فارغًا لاستخدام %1$s</string>
   <string name="setting_page_preferences_notification">الإشعارات</string>
-  <string name="setting_page_preferences_notification_desc">تنبيهات التحديث، إشعارات توليد الرسائل</string>
+  <string name="setting_page_preferences_notification_desc">إشعارات إنشاء الرسائل</string>
   <string name="setting_page_preferences_theme">المظهر</string>
   <string name="setting_page_preferences_theme_desc">الألوان الديناميكية، السمة، وضع AMOLED الداكن</string>
   <string name="setting_page_preferences_ui">تفضيلات واجهة المستخدم</string>
@@ -987,10 +982,6 @@
   <string name="setting_page_share">مشاركة</string>
   <string name="setting_page_share_desc">شارك هذا التطبيق مع أصدقائك</string>
   <string name="setting_page_share_text">RikkaHub - مساعد ذكاء اصطناعي مفتوح المصدر لأندرويد\n\nالموقع الإلكتروني: https://rikka-ai.com/</string>
-  <string name="setting_page_sponsor_alert_confirm">تبرّع</string>
-  <string name="setting_page_sponsor_alert_desc">لقد قمت بتشغيل التطبيق أكثر من 100 مرة! إذا كنت تستمتع باستخدامه، فيرجى التفكير في دعم المطوّر.</string>
-  <string name="setting_page_sponsor_alert_dismiss">ليس الآن</string>
-  <string name="setting_page_sponsor_alert_title">دعم المطوّر</string>
   <string name="setting_page_theme_setting">السمة</string>
   <string name="setting_page_theme_setting_desc">تخصيص نظام ألوان التطبيق</string>
   <string name="setting_page_tts_service">خدمات الكلام</string>
@@ -1074,7 +1065,6 @@
   <string name="setting_provider_page_provider_override_desc">تكوين إعدادات مزوّد مخصصة لهذا النموذج المحدد. سيرث الخصائص المشتركة من المزوّد الأصل.</string>
   <string name="setting_provider_page_qr_decode_failed">فشل تحليل رمز QR: %s</string>
   <string name="setting_provider_page_reasoning">الاستدلال</string>
-  <string name="setting_provider_page_recommend">المزوّدون الموصى بهم</string>
   <string name="setting_provider_page_response_api">Response API</string>
   <string name="setting_provider_page_response_api_warning">Response API هي واجهة API من الجيل التالي من OpenAI. لا يدعمها معظم المزوّدين. إذا كنت لا تعرف ما هي، فلا تفعّلها.</string>
   <string name="setting_provider_page_save">حفظ</string>
@@ -1167,12 +1157,6 @@
   <string name="setting_tts_page_voice_name">اسم الصوت</string>
   <string name="setting_tts_page_voice_name_description">اسم الصوت</string>
   <string name="setting_tts_page_voice_name_placeholder">Kore</string>
-  <string name="setting_update_reminder_enabled">تذكيرات التحديث مفعّلة</string>
-  <string name="setting_update_reminder_pause_days">%1$d أيام</string>
-  <string name="setting_update_reminder_pause_description">اختر مدة إيقاف تذكيرات التحديث مؤقتًا. ستستأنف تلقائيًا.</string>
-  <string name="setting_update_reminder_pause_title">إيقاف تذكيرات التحديث مؤقتًا</string>
-  <string name="setting_update_reminder_paused_until">متوقفة حتى %1$s</string>
-  <string name="setting_update_reminder_resume_now">استئناف الآن</string>
   <string name="settings">الإعدادات</string>
   <string name="share">مشاركة</string>
   <string name="share_handler_page_title">اختر مساعدًا</string>
@@ -1285,11 +1269,6 @@
   <string name="translator_page_translate">ترجم</string>
   <string name="tts">TTS</string>
   <string name="unpin_chat">إلغاء تثبيت الدردشة</string>
-  <string name="update_card_check_failed">فشل التحقق من التحديث</string>
-  <string name="update_card_close">إغلاق</string>
-  <string name="update_card_downloading">جارٍ التنزيل، يرجى التحقق من شريط الحالة لمتابعة التقدم</string>
-  <string name="update_card_new_version_found">تم العثور على إصدار جديد %s</string>
-  <string name="update_card_unknown_error">خطأ غير معروف</string>
   <string name="upload_file">رفع ملف</string>
   <string name="use_web_search">البحث في الويب</string>
   <string name="user_default_name">المستخدم</string>

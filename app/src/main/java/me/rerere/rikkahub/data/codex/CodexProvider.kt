@@ -35,7 +35,6 @@ import me.rerere.ai.ui.StreamChunk
 import me.rerere.ai.ui.StreamChunkHandler
 import me.rerere.ai.ui.UIMessage
 import me.rerere.common.http.await
-import me.rerere.ai.util.json
 import me.rerere.rikkahub.AppScope
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -62,7 +61,7 @@ class CodexProvider(
                 if (response.code == 401) repository.markInvalid(account.id)
                 error("Failed to get Codex models: ${response.code} ${response.body.string()}")
             }
-            parseCodexModels(response.body.string())
+            parseCodexModels(response.body.string(), json)
         }
 
     override suspend fun generateText(
@@ -225,7 +224,10 @@ class CodexProvider(
  * `/backend-api/codex/models` contract; only models explicitly visible to the Codex client are
  * admitted, so unrelated ChatGPT catalog entries are not guessed into the picker.
  */
-internal fun parseCodexModels(body: String): List<Model> {
+internal fun parseCodexModels(body: String): List<Model> =
+    parseCodexModels(body, Json { ignoreUnknownKeys = true })
+
+internal fun parseCodexModels(body: String, json: Json): List<Model> {
     val models = (json.parseToJsonElement(body) as? JsonObject)
         ?.get("models") as? JsonArray
         ?: return emptyList()

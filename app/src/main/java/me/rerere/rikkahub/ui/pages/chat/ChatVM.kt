@@ -19,9 +19,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import me.rerere.ai.provider.Model
@@ -44,8 +41,6 @@ import me.rerere.rikkahub.service.ChatError
 import me.rerere.rikkahub.service.ChatService
 import me.rerere.rikkahub.ui.hooks.writeStringPreference
 import me.rerere.rikkahub.ui.hooks.ChatInputState
-import me.rerere.rikkahub.utils.UiState
-import me.rerere.rikkahub.utils.UpdateChecker
 import me.rerere.rikkahub.web.ApiException
 import java.util.Locale
 import kotlin.uuid.Uuid
@@ -57,7 +52,6 @@ class ChatVM(
     private val context: Application,
     private val settingsStore: SettingsStore,
     private val chatService: ChatService,
-    val updateChecker: UpdateChecker,
     private val analytics: FirebaseAnalytics,
     private val filesManager: FilesManager,
     private val favoriteRepository: FavoriteRepository,
@@ -201,22 +195,6 @@ class ChatVM(
             chatService.updateChatSearch(_conversationId, enableWebSearch, builtInSearch)
         }
     }
-
-    // Update checker
-    val updateState = settingsStore.settingsFlow
-        .map { settings ->
-            !settings.init &&
-                settings.displaySetting.updateCheckDisabledUntilEpochMillis <= System.currentTimeMillis()
-        }
-        .distinctUntilChanged()
-        .flatMapLatest { enabled ->
-            if (enabled) updateChecker.updateState else flowOf(UiState.Loading)
-        }
-        .stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
-            UiState.Loading,
-        )
 
     /**
      * 处理消息发送

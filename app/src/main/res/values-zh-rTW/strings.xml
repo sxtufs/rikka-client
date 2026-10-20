@@ -1,13 +1,10 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <resources>
-  <string name="about_page_github">Github</string>
-  <string name="about_page_license">授權條款</string>
   <string name="about_page_system">系統</string>
   <string name="about_page_title">關於</string>
   <string name="about_page_version">版本</string>
-  <string name="about_page_website">官網</string>
   <string name="add">添加</string>
-  <string name="app_name">RikkaHub</string>
+  <string name="app_name">RikkaDev</string>
   <string name="asr_button_content_description">語音辨識</string>
   <string name="asr_button_stop">停止</string>
   <string name="assistant_detail_basic_desc">設定名稱、頭像、模型與參數</string>
@@ -663,8 +660,6 @@
   <string name="setting_display_page_show_thinking_content_title">顯示思考內容</string>
   <string name="setting_display_page_show_token_usage_desc">顯示token用量和消息數量</string>
   <string name="setting_display_page_show_token_usage_title">顯示Token和上下文統計</string>
-  <string name="setting_display_page_show_updates_desc">是否顯示應用更新通知</string>
-  <string name="setting_display_page_show_updates_title">顯示更新</string>
   <string name="setting_display_page_show_user_avatar_desc">是否在聊天消息中顯示用戶頭像</string>
   <string name="setting_display_page_show_user_avatar_title">顯示用戶頭像</string>
   <string name="setting_display_page_skip_crop_image_desc">匯入圖片或拍照後跳過裁剪介面</string>
@@ -802,10 +797,6 @@
   <string name="setting_page_share">分享</string>
   <string name="setting_page_share_desc">分享本APP給朋友</string>
   <string name="setting_page_share_text">RikkaHub - 開源安卓AI助手\n\n官網: https://rikka-ai.com/</string>
-  <string name="setting_page_sponsor_alert_confirm">捐款</string>
-  <string name="setting_page_sponsor_alert_desc">您已啟動應用程式超過 100 次！如果您喜歡使用它，請考慮支持開發者。</string>
-  <string name="setting_page_sponsor_alert_dismiss">稍後再說</string>
-  <string name="setting_page_sponsor_alert_title">支援開發者</string>
   <string name="setting_page_theme_setting">主題</string>
   <string name="setting_page_theme_setting_desc">自訂應用配色方案</string>
   <string name="setting_theme_page_preset_themes">預設主題</string>
@@ -908,7 +899,6 @@
   <string name="setting_provider_page_scan_error">錯誤: %s</string>
   <string name="setting_provider_page_scan_qr_code">掃描二維碼</string>
   <string name="setting_provider_page_search_providers">搜尋提供者</string>
-  <string name="setting_provider_page_recommend">推薦提供者</string>
   <string name="setting_provider_page_select_all">全選 (%1$d)</string>
   <string name="setting_provider_page_select_from_gallery">從相簿選擇</string>
   <string name="setting_provider_page_service_account_email">服務帳戶郵箱</string>
@@ -1052,11 +1042,6 @@
   <string name="translator_page_translate">翻譯</string>
   <string name="tts">語音</string>
   <string name="unpin_chat">取消釘選聊天</string>
-  <string name="update_card_check_failed">檢查更新失敗</string>
-  <string name="update_card_close">關閉</string>
-  <string name="update_card_downloading">正在下載，請查看狀態列以瞭解進度</string>
-  <string name="update_card_new_version_found">發現新版本 %s</string>
-  <string name="update_card_unknown_error">未知錯誤</string>
   <string name="upload_file">上傳檔案</string>
   <string name="use_web_search">網路搜尋</string>
   <string name="user_default_name">用戶</string>
@@ -1080,7 +1065,7 @@
   <string name="setting_page_preferences_theme">主題</string>
   <string name="setting_page_preferences_theme_desc">動態色彩、主題、AMOLED 深色模式</string>
   <string name="setting_page_preferences_notification">通知</string>
-  <string name="setting_page_preferences_notification_desc">更新提醒、訊息產生通知</string>
+  <string name="setting_page_preferences_notification_desc">訊息產生通知</string>
   <string name="setting_page_preferences_general">一般</string>
   <string name="setting_page_preferences_general_desc">互動行為、捲動、輸入設定</string>
   <string name="setting_page_preferences_ui">UI 偏好設定</string>
@@ -1264,12 +1249,6 @@
   <string name="search_picker_model_description">模型提供者內建的雲端搜尋</string>
   <string name="search_picker_select_provider">選擇搜尋提供者</string>
   <string name="search_picker_turn_off">關閉搜尋</string>
-  <string name="setting_update_reminder_enabled">更新提醒已啟用</string>
-  <string name="setting_update_reminder_paused_until">已暫停至 %1$s</string>
-  <string name="setting_update_reminder_pause_title">暫停更新提醒</string>
-  <string name="setting_update_reminder_pause_description">選擇暫停更新提醒的時長。它們會自動恢復。</string>
-  <string name="setting_update_reminder_pause_days">%1$d 天</string>
-  <string name="setting_update_reminder_resume_now">立即恢復</string>
   <string name="reasoning_max">最大</string>
   <string name="backup_page_import_overwrite_confirm">匯入備份將覆寫應用程式資料。是否繼續？</string>
   <string name="setting_page_preferences_network">網路</string>

@@ -1,13 +1,10 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <resources>
-  <string name="about_page_github">GitHub</string>
-  <string name="about_page_license">Лицензия</string>
   <string name="about_page_system">Система</string>
   <string name="about_page_title">О приложении</string>
   <string name="about_page_version">Версия</string>
-  <string name="about_page_website">Веб-сайт</string>
   <string name="add">Добавить</string>
-  <string name="app_name">RikkaHub</string>
+  <string name="app_name">RikkaDev</string>
   <string name="asr_button_content_description">Распознавание речи</string>
   <string name="asr_button_stop">Стоп</string>
   <string name="assistant_detail_basic_desc">Настройте имя, аватар, модель и параметры</string>
@@ -663,8 +660,6 @@
   <string name="setting_display_page_show_thinking_content_title">Показывать содержание размышлений</string>
   <string name="setting_display_page_show_token_usage_desc">Отображать использование токенов и количество сообщений</string>
   <string name="setting_display_page_show_token_usage_title">Показывать статистику токенов и контекста</string>
-  <string name="setting_display_page_show_updates_desc">Отображать ли уведомления об обновлениях приложения</string>
-  <string name="setting_display_page_show_updates_title">Показывать обновления</string>
   <string name="setting_display_page_show_user_avatar_desc">Отображать аватар пользователя в сообщениях чата</string>
   <string name="setting_display_page_show_user_avatar_title">Показывать аватар пользователя</string>
   <string name="setting_display_page_skip_crop_image_desc">Пропустить обрезку после импорта изображений или съёмки</string>
@@ -802,10 +797,6 @@
   <string name="setting_page_share">Поделиться</string>
   <string name="setting_page_share_desc">Поделиться этим приложением с друзьями</string>
   <string name="setting_page_share_text">RikkaHub — открытый Android-ассистент с ИИ\n\nСайт: https://rikka-ai.com/</string>
-  <string name="setting_page_sponsor_alert_confirm">Пожертвовать</string>
-  <string name="setting_page_sponsor_alert_desc">Вы запустили приложение более 100 раз! Если вам нравится им пользоваться, пожалуйста, поддержите разработчика.</string>
-  <string name="setting_page_sponsor_alert_dismiss">Не сейчас</string>
-  <string name="setting_page_sponsor_alert_title">Поддержать разработчика</string>
   <string name="setting_page_theme_setting">Тема</string>
   <string name="setting_page_theme_setting_desc">Настроить цветовую схему приложения</string>
   <string name="setting_theme_page_preset_themes">Предустановленные темы</string>
@@ -910,7 +901,6 @@
   <string name="setting_provider_page_scan_error">Ошибка: %s</string>
   <string name="setting_provider_page_scan_qr_code">Сканировать QR-код</string>
   <string name="setting_provider_page_search_providers">Поиск поставщиков</string>
-  <string name="setting_provider_page_recommend">Рекомендуемые поставщики</string>
   <string name="setting_provider_page_select_all">Выбрать все (%1$d)</string>
   <string name="setting_provider_page_select_from_gallery">Выбрать из галереи</string>
   <string name="setting_provider_page_service_account_email">Электронная почта служебной учётной записи</string>
@@ -1054,11 +1044,6 @@
   <string name="translator_page_translate">Перевести</string>
   <string name="tts">TTS</string>
   <string name="unpin_chat">Открепить чат</string>
-  <string name="update_card_check_failed">Проверка обновления не удалась</string>
-  <string name="update_card_close">Закрыть</string>
-  <string name="update_card_downloading">Идёт загрузка, следите за прогрессом в строке состояния</string>
-  <string name="update_card_new_version_found">Найдена новая версия %s</string>
-  <string name="update_card_unknown_error">Неизвестная ошибка</string>
   <string name="upload_file">Загрузить файл</string>
   <string name="use_web_search">Веб-поиск</string>
   <string name="user_default_name">Пользователь</string>
@@ -1082,7 +1067,7 @@
   <string name="setting_page_preferences_theme">Тема</string>
   <string name="setting_page_preferences_theme_desc">Динамические цвета, тема, тёмный режим AMOLED</string>
   <string name="setting_page_preferences_notification">Уведомления</string>
-  <string name="setting_page_preferences_notification_desc">Уведомления об обновлениях и генерации сообщений</string>
+  <string name="setting_page_preferences_notification_desc">Уведомления о создании сообщений</string>
   <string name="setting_page_preferences_general">Общие</string>
   <string name="setting_page_preferences_general_desc">Поведение взаимодействия, прокрутка, настройки ввода</string>
   <string name="setting_page_preferences_ui">Настройки интерфейса</string>
@@ -1266,12 +1251,6 @@
   <string name="search_picker_model_description">Облачный поиск, встроенный в провайдера моделей</string>
   <string name="search_picker_select_provider">Выберите провайдера поиска</string>
   <string name="search_picker_turn_off">Отключить поиск</string>
-  <string name="setting_update_reminder_enabled">Напоминания об обновлениях включены</string>
-  <string name="setting_update_reminder_paused_until">Приостановлено до %1$s</string>
-  <string name="setting_update_reminder_pause_title">Приостановить напоминания об обновлениях</string>
-  <string name="setting_update_reminder_pause_description">Выберите, как долго приостановить напоминания об обновлениях. Они возобновятся автоматически.</string>
-  <string name="setting_update_reminder_pause_days">%1$d дн.</string>
-  <string name="setting_update_reminder_resume_now">Возобновить сейчас</string>
   <string name="reasoning_max">Максимум</string>
   <string name="backup_page_import_overwrite_confirm">Импорт резервной копии перезапишет данные приложения. Продолжить?</string>
   <string name="setting_page_preferences_network">Сеть</string>
