@@ -46,6 +46,11 @@ val ProviderSetting.supportsBuiltInSearch: Boolean
         is ProviderSetting.Google -> true
         is ProviderSetting.Claude -> true
         is ProviderSetting.Account -> true
+        // The custom OAuth transports do not expose the upstream built-in tool protocol.
+        is ProviderSetting.Codex,
+        is ProviderSetting.Grok,
+        is ProviderSetting.GeminiOAuth -> false
+        else -> false
     }
 
 @Serializable
@@ -284,74 +289,22 @@ sealed class ProviderSetting {
     }
 
     @Serializable
-    @SerialName("grok")
-    data class Grok(
-        override val id: Uuid = Uuid.random(),
-        override val enabled: Boolean = true,
-        override val name: String = "Grok",
-        override val models: List<Model> = emptyList(),
-        override val customHeaders: List<CustomHeader> = emptyList(),
-        @Transient override val builtIn: Boolean = false,
-        @Transient override val description: @Composable (() -> Unit) = {},
-        @Transient override val shortDescription: @Composable (() -> Unit) = {},
-        override val credential: OAuthCredential? = null,
-    ) : Account() {
-        override fun withCredential(credential: OAuthCredential?): Account = copy(credential = credential)
-
-        override fun copyProvider(
-            id: Uuid,
-            enabled: Boolean,
-            name: String,
-            models: List<Model>,
-            customHeaders: List<CustomHeader>,
-            builtIn: Boolean,
-            description: @Composable (() -> Unit),
-            shortDescription: @Composable (() -> Unit),
-        ): ProviderSetting {
-            return this.copy(
-                id = id,
-                enabled = enabled,
-                name = name,
-                models = models,
-                customHeaders = customHeaders,
-                builtIn = builtIn,
-                description = description,
-                shortDescription = shortDescription,
-            )
-        }
-    }
-
-    @Serializable
     @SerialName("codex")
     data class Codex(
         override var id: Uuid = Uuid.random(),
         override var enabled: Boolean = false,
         override var name: String = "Codex",
         override var models: List<Model> = emptyList(),
-        override val balanceOption: BalanceOption = BalanceOption(),
         override val customHeaders: List<CustomHeader> = emptyList(),
         @Transient override val builtIn: Boolean = true,
         @Transient override val description: @Composable (() -> Unit) = {},
         @Transient override val shortDescription: @Composable (() -> Unit) = {},
     ) : ProviderSetting() {
-        override fun addModel(model: Model): ProviderSetting = copy(models = models + model)
-
-        override fun editModel(model: Model): ProviderSetting =
-            copy(models = models.map { if (it.id == model.id) model.copy() else it })
-
-        override fun delModel(model: Model): ProviderSetting =
-            copy(models = models.filter { it.id != model.id })
-
-        override fun moveMove(from: Int, to: Int): ProviderSetting = copy(
-            models = models.toMutableList().apply { add(to, removeAt(from)) }
-        )
-
         override fun copyProvider(
             id: Uuid,
             enabled: Boolean,
             name: String,
             models: List<Model>,
-            balanceOption: BalanceOption,
             customHeaders: List<CustomHeader>,
             builtIn: Boolean,
             description: @Composable (() -> Unit),
@@ -361,7 +314,6 @@ sealed class ProviderSetting {
             enabled = enabled,
             name = name,
             models = models,
-            balanceOption = balanceOption,
             customHeaders = customHeaders,
             builtIn = builtIn,
             description = description,
@@ -376,30 +328,16 @@ sealed class ProviderSetting {
         override var enabled: Boolean = false,
         override var name: String = "Grok",
         override var models: List<Model> = emptyList(),
-        override val balanceOption: BalanceOption = BalanceOption(),
         override val customHeaders: List<CustomHeader> = emptyList(),
         @Transient override val builtIn: Boolean = true,
         @Transient override val description: @Composable (() -> Unit) = {},
         @Transient override val shortDescription: @Composable (() -> Unit) = {},
     ) : ProviderSetting() {
-        override fun addModel(model: Model): ProviderSetting = copy(models = models + model)
-
-        override fun editModel(model: Model): ProviderSetting =
-            copy(models = models.map { if (it.id == model.id) model.copy() else it })
-
-        override fun delModel(model: Model): ProviderSetting =
-            copy(models = models.filter { it.id != model.id })
-
-        override fun moveMove(from: Int, to: Int): ProviderSetting = copy(
-            models = models.toMutableList().apply { add(to, removeAt(from)) }
-        )
-
         override fun copyProvider(
             id: Uuid,
             enabled: Boolean,
             name: String,
             models: List<Model>,
-            balanceOption: BalanceOption,
             customHeaders: List<CustomHeader>,
             builtIn: Boolean,
             description: @Composable (() -> Unit),
@@ -409,7 +347,6 @@ sealed class ProviderSetting {
             enabled = enabled,
             name = name,
             models = models,
-            balanceOption = balanceOption,
             customHeaders = customHeaders,
             builtIn = builtIn,
             description = description,
@@ -424,30 +361,16 @@ sealed class ProviderSetting {
         override var enabled: Boolean = false,
         override var name: String = "Gemini OAuth",
         override var models: List<Model> = emptyList(),
-        override val balanceOption: BalanceOption = BalanceOption(),
         override val customHeaders: List<CustomHeader> = emptyList(),
         @Transient override val builtIn: Boolean = true,
         @Transient override val description: @Composable (() -> Unit) = {},
         @Transient override val shortDescription: @Composable (() -> Unit) = {},
     ) : ProviderSetting() {
-        override fun addModel(model: Model): ProviderSetting = copy(models = models + model)
-
-        override fun editModel(model: Model): ProviderSetting =
-            copy(models = models.map { if (it.id == model.id) model.copy() else it })
-
-        override fun delModel(model: Model): ProviderSetting =
-            copy(models = models.filter { it.id != model.id })
-
-        override fun moveMove(from: Int, to: Int): ProviderSetting = copy(
-            models = models.toMutableList().apply { add(to, removeAt(from)) }
-        )
-
         override fun copyProvider(
             id: Uuid,
             enabled: Boolean,
             name: String,
             models: List<Model>,
-            balanceOption: BalanceOption,
             customHeaders: List<CustomHeader>,
             builtIn: Boolean,
             description: @Composable (() -> Unit),
@@ -457,7 +380,6 @@ sealed class ProviderSetting {
             enabled = enabled,
             name = name,
             models = models,
-            balanceOption = balanceOption,
             customHeaders = customHeaders,
             builtIn = builtIn,
             description = description,
