@@ -8,9 +8,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import me.rerere.ai.provider.ProviderQuota
 import me.rerere.common.http.await
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
@@ -76,7 +78,9 @@ class GrokAccountRepository internal constructor(
         account
     }
 
-    suspend fun acquireAccount(): GrokAccount = mutex.withLock {
+    suspend fun acquireAccount(): GrokAccount = mutex.withLock { acquireAccountLocked() }
+
+    private suspend fun acquireAccountLocked(): GrokAccount {
         if (state.accounts.isEmpty()) error("No Grok account is signed in")
         repeat(state.accounts.size) {
             val index = selectGrokAccountIndex(
@@ -90,6 +94,24 @@ class GrokAccountRepository internal constructor(
             return fresh
         }
         error("No available Grok account")
+    }
+
+    /** Fetch the current account's weekly or monthly subscription quota. */
+    suspend fun getQuota(): ProviderQuota? = mutex.withLock {
+        val account = acquireAccountLocked()
+        val credits = fetchBillingJsonLocked(account, CREDITS_URL)
+        val weekly = parseGrokWeeklyQuota(credits)
+        val snapshot = parseGrokCreditsUsage(credits)
+        replaceAccount(account.id) { it.copy(usage = snapshot) }
+
+        if (weekly != null && !credits.isGrokUnifiedBilling()) {
+            return@withLock weekly
+        }
+
+        val monthly = runCatching {
+            parseGrokMonthlyQuota(fetchBillingJsonLocked(account, MONTHLY_BILLING_URL))
+        }.getOrNull()
+        monthly ?: weekly
     }
 
     suspend fun setEnabled(accountId: String, enabled: Boolean) = mutex.withLock {
@@ -165,6 +187,22 @@ class GrokAccountRepository internal constructor(
         return updated
     }
 
+    private suspend fun fetchBillingJsonLocked(account: GrokAccount, url: String): JsonObject {
+        val response = withContext(Dispatchers.IO) {
+            client.newCall(
+                Request.Builder().url(url).grokBillingHeaders(account).get().build()
+            ).await()
+        }
+        val body = response.body.string()
+        if (!response.isSuccessful) {
+            if (response.code == 401) {
+                replaceAccount(account.id) { it.copy(tokenStatus = GrokTokenStatus.INVALID) }
+            }
+            error("Failed to fetch Grok billing: ${response.code}")
+        }
+        return json.parseToJsonElement(body).jsonObject
+    }
+
     private suspend fun fetchUsageLocked(account: GrokAccount): GrokAccount {
         val credits = withContext(Dispatchers.IO) {
             client.newCall(
@@ -231,6 +269,7 @@ class GrokAccountRepository internal constructor(
         // Grok subscription usage lives on the CLI billing proxy (same surface the Grok CLI uses),
         // not on api.x.ai. The credits format returns the shared weekly pool.
         private const val CREDITS_URL = "https://cli-chat-proxy.grok.com/v1/billing?format=credits"
+        private const val MONTHLY_BILLING_URL = "https://cli-chat-proxy.grok.com/v1/billing"
         private const val SETTINGS_URL = "https://cli-chat-proxy.grok.com/v1/settings"
     }
 }

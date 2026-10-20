@@ -1,11 +1,17 @@
 package me.rerere.rikkahub.data.grok
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
@@ -21,6 +27,7 @@ import me.rerere.ai.provider.Model
 import me.rerere.ai.provider.ModelAbility
 import me.rerere.ai.provider.ModelType
 import me.rerere.ai.provider.Provider
+import me.rerere.ai.provider.ProviderQuota
 import me.rerere.ai.provider.ProviderSetting
 import me.rerere.ai.provider.TextGenerationParams
 import me.rerere.ai.provider.TextGenerationResult
@@ -49,45 +56,49 @@ class GrokProvider(
     override suspend fun listModels(providerSetting: ProviderSetting.Grok): List<Model> =
         withContext(Dispatchers.IO) {
             val account = repository.acquireAccount()
-            val request = Request.Builder()
-                .url("$API_BASE/models")
-                .grokHeaders(account)
-                .get()
-                .build()
-            val response = client.newCall(request).await()
-            if (!response.isSuccessful) {
-                if (response.code == 401) repository.markInvalid(account.id)
-                error("Failed to get Grok models: ${response.code} ${response.body.string()}")
-            }
-            val models = json.parseToJsonElement(response.body.string())
-                .jsonObject["data"]?.jsonArray
-                ?: return@withContext emptyList()
-            models.mapNotNull { element ->
-                val item = element.jsonObject
-                val id = item["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                // xAI's /models already lists the Grok Imagine image models next to the chat
-                // models. Tag the image-generation ones as ModelType.IMAGE so they appear in the
-                // image-generation picker (which filters strictly by ModelType.IMAGE), the same
-                // way an image-capable OpenRouter model does. Classified by name off the live
-                // list, so new Imagine image releases surface automatically with no pinned list.
-                if (isGrokImageModel(id)) {
-                    Model(
-                        modelId = id,
-                        displayName = id,
-                        type = ModelType.IMAGE,
-                        inputModalities = listOf(Modality.TEXT),
-                        outputModalities = listOf(Modality.IMAGE),
-                    )
-                } else {
-                    Model(
-                        modelId = id,
-                        displayName = id,
-                        inputModalities = listOf(Modality.TEXT, Modality.IMAGE),
-                        abilities = listOf(ModelAbility.TOOL, ModelAbility.REASONING),
-                    )
+            coroutineScope {
+                val cli = async {
+                    runCatching { fetchCatalog(account, GROK_CLI_MODELS_URL, cli = true) }
                 }
+                val api = async {
+                    runCatching { fetchCatalog(account, "$API_BASE/models") }
+                }
+                val cliCatalog = cli.await()
+                val apiCatalog = api.await()
+                if (cliCatalog.isFailure && apiCatalog.isFailure) {
+                    throw cliCatalog.exceptionOrNull() ?: apiCatalog.exceptionOrNull()!!
+                }
+                parseGrokModels(
+                    cliCatalog = cliCatalog.getOrNull(),
+                    apiCatalog = apiCatalog.getOrNull(),
+                )
             }
         }
+
+    override suspend fun getQuota(providerSetting: ProviderSetting.Grok): ProviderQuota? =
+        repository.getQuota()
+
+    private suspend fun fetchCatalog(
+        account: GrokAccount,
+        url: String,
+        cli: Boolean = false,
+    ): JsonObject {
+        val response = client.newCall(
+            Request.Builder()
+                .url(url)
+                .grokHeaders(account, cli = cli)
+                .get()
+                .build()
+        ).await()
+        val body = response.body.string()
+        if (!response.isSuccessful) {
+            // The CLI catalog is an optional enhancement; do not invalidate a usable account
+            // merely because that auxiliary endpoint rejects the token.
+            if (response.code == 401 && !cli) repository.markInvalid(account.id)
+            error("Failed to get Grok models: ${response.code} $body")
+        }
+        return json.parseToJsonElement(body).jsonObject
+    }
 
     override suspend fun generateText(
         providerSetting: ProviderSetting.Grok,
@@ -131,7 +142,7 @@ class GrokProvider(
     private fun withGrokParams(params: TextGenerationParams, account: GrokAccount): TextGenerationParams {
         val reasoningEffort = params.model.abilities
             .takeIf { it.contains(ModelAbility.REASONING) }
-            ?.let { grokReasoningEffort(params.reasoningLevel) }
+            ?.let { grokReasoningEffort(params.reasoningLevel, params.model.modelId) }
         return params.copy(
             customHeaders = params.customHeaders + CustomHeader("User-Agent", GrokOAuthManager.USER_AGENT),
             customBody = params.customBody + listOfNotNull(
@@ -245,16 +256,113 @@ class GrokProvider(
             ImageGenerationItem(data = Base64.encode(respBody.bytes()), mimeType = mimeType)
         }
 
-    private fun Request.Builder.grokHeaders(account: GrokAccount): Request.Builder {
+    private fun Request.Builder.grokHeaders(
+        account: GrokAccount,
+        cli: Boolean = false,
+    ): Request.Builder {
         return header("Authorization", "Bearer ${account.accessToken}")
             .header("User-Agent", GrokOAuthManager.USER_AGENT)
+            .apply {
+                if (cli) header("X-XAI-Token-Auth", "xai-grok-cli")
+            }
     }
 
     private companion object {
         const val API_BASE = "https://api.x.ai/v1"
+        const val GROK_CLI_MODELS_URL = "https://cli-chat-proxy.grok.com/v1/models-v2"
 
         // Default output resolution for Grok Imagine image generation ("1k" or "2k").
         const val GROK_IMAGE_RESOLUTION = "1k"
+    }
+}
+
+/**
+ * Merge the CLI catalog first, then fill in models from xAI's public catalog.
+ * The CLI catalog contains reasoning metadata and context windows; the public catalog is a
+ * fallback when the CLI endpoint is unavailable. Imagine image models remain visible to the
+ * custom image-generation implementation.
+ */
+internal fun parseGrokModels(
+    cliCatalog: JsonObject?,
+    apiCatalog: JsonObject?,
+): List<Model> {
+    val models = linkedMapOf<String, Model>()
+    listOfNotNull(cliCatalog, apiCatalog).forEach { catalog ->
+        (catalog["data"] as? JsonArray)
+            .orEmpty()
+            .filterIsInstance<JsonObject>()
+            .forEach { row ->
+                val meta = row["_meta"] as? JsonObject
+                val id = row.string("model")
+                    ?: row.string("modelId")
+                    ?: row.string("id")
+                    ?: meta?.string("model")
+                    ?: meta?.string("modelId")
+                    ?: return@forEach
+                if (id in models) return@forEach
+                if (row["hidden"]?.jsonPrimitive?.booleanOrNull == true ||
+                    meta?.get("hidden")?.jsonPrimitive?.booleanOrNull == true
+                ) return@forEach
+
+                if (isGrokImageModel(id)) {
+                    models[id] = Model(
+                        modelId = id,
+                        displayName = row.string("name") ?: row.string("displayName") ?: id,
+                        type = ModelType.IMAGE,
+                        inputModalities = listOf(Modality.TEXT),
+                        outputModalities = listOf(Modality.IMAGE),
+                    )
+                    return@forEach
+                }
+                if (id.contains("video", ignoreCase = true) ||
+                    id.contains("tts", ignoreCase = true) ||
+                    id.contains("embed", ignoreCase = true)
+                ) return@forEach
+
+                val efforts = (row["reasoningEfforts"]
+                    ?: row["reasoning_efforts"]
+                    ?: meta?.get("reasoningEfforts")) as? JsonArray
+                val contextWindow = listOf(
+                    row["contextWindow"],
+                    row["context_window"],
+                    meta?.get("contextWindow"),
+                    meta?.get("totalContextTokens"),
+                ).firstNotNullOfOrNull { it?.jsonPrimitive?.contentOrNull?.toIntOrNull() }
+                models[id] = Model(
+                    modelId = id,
+                    displayName = row.string("name")
+                        ?: row.string("displayName")
+                        ?: row.string("display_name")
+                        ?: meta?.string("displayName")
+                        ?: id,
+                    inputModalities = listOf(Modality.TEXT, Modality.IMAGE),
+                    abilities = buildList {
+                        add(ModelAbility.TOOL)
+                        if (!efforts.isNullOrEmpty()) add(ModelAbility.REASONING)
+                    },
+                    contextLength = contextWindow ?: Model().contextLength,
+                )
+            }
+    }
+    return models.values.toList()
+}
+
+private fun JsonObject.string(key: String): String? =
+    this[key]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+
+/** Select the model-specific reasoning parameter accepted by xAI. */
+internal fun grokReasoningEffort(level: ReasoningLevel, modelId: String): String? {
+    if (Regex("""^grok-4\.20(-\d{4})?-(non-)?reasoning$""")
+            .matches(modelId)
+    ) return null
+    return when (level) {
+        ReasoningLevel.AUTO -> null
+        ReasoningLevel.OFF -> "none"
+        ReasoningLevel.LOW -> "low"
+        ReasoningLevel.MEDIUM -> "medium"
+        ReasoningLevel.HIGH -> "high"
+        ReasoningLevel.XHIGH, ReasoningLevel.MAX ->
+            if (modelId == "grok-4.6") "xhigh" else "high"
     }
 }
 

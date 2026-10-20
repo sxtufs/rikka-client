@@ -59,7 +59,7 @@ val ProviderSetting.supportsQuota: Boolean
         is ProviderSetting.ApiKey -> quotaQuery.enabled
         is ProviderSetting.Account -> credential != null
         is ProviderSetting.Codex -> false
-        is ProviderSetting.Grok -> false
+        is ProviderSetting.Grok -> true
         is ProviderSetting.GeminiOAuth -> false
         else -> false
     }
