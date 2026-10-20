@@ -182,6 +182,16 @@ class MediaCreationService(
         repository.getRecord(recordId)?.let { repository.deleteRecord(it) }
     }
 
+    /** 删除时间线上的若干项，连同它们的所有版本，返回删掉的记录。 */
+    suspend fun deleteNodes(sessionId: Uuid, nodeIds: Collection<Uuid>): List<Uuid> = inAppScope {
+        nodeIds.flatMap { nodeId ->
+            val versions = repository.getVersionIds(nodeId)
+            versions.forEach { jobs[it]?.cancelAndJoin() }
+            repository.deleteNode(sessionId, nodeId)
+            versions
+        }
+    }
+
     suspend fun deleteSession(sessionId: Uuid) = inAppScope {
         repository.getRecordsOfSession(sessionId).forEach { jobs[it.id]?.cancelAndJoin() }
         repository.deleteSession(sessionId)
@@ -385,7 +395,11 @@ class MediaCreationService(
             val url = output.url
             when {
                 data != null -> file.writeBytes(data)
-                url != null -> download(setting, url, file)
+                url != null -> {
+                    Log.i(TAG, "Downloading output $index (${output.mimeType}) from $url")
+                    download(setting, url, file)
+                    Log.i(TAG, "Downloaded output $index: ${file.length()} bytes -> ${file.name}")
+                }
                 else -> return@mapIndexedNotNull null
             }
 

@@ -14,44 +14,46 @@ import me.rerere.mediagen.provider.MediaGenerationManager
 import me.rerere.rikkahub.AppScope
 import me.rerere.rikkahub.BuildConfig
 import me.rerere.rikkahub.data.ai.AIRequestInterceptor
-import me.rerere.rikkahub.data.ai.RequestLoggingInterceptor
-import me.rerere.rikkahub.data.ai.transformers.AssistantTemplateLoader
-import me.rerere.rikkahub.data.ai.GenerationLoop
+import me.rerere.rikkahub.data.ai.ConversationMetaGenerator
 import me.rerere.rikkahub.data.ai.MemoryConsolidationScheduler
 import me.rerere.rikkahub.data.ai.MemoryConsolidator
+import me.rerere.rikkahub.data.ai.RequestLoggingInterceptor
 import me.rerere.rikkahub.data.ai.TranslationHandler
-import me.rerere.rikkahub.data.ai.transformers.TemplateTransformer
-import me.rerere.rikkahub.data.remote.RikkaHubAPI
-import me.rerere.rikkahub.data.remote.SponsorAPI
-import me.rerere.rikkahub.data.datastore.SettingsStore
+import me.rerere.rikkahub.data.ai.UsageRecorder
+import me.rerere.rikkahub.data.ai.account.ProviderAccountManager
 import me.rerere.rikkahub.data.codex.CodexAccountRepository
 import me.rerere.rikkahub.data.codex.CodexCredentialStore
 import me.rerere.rikkahub.data.codex.CodexOAuthManager
 import me.rerere.rikkahub.data.codex.CodexProvider
-import me.rerere.rikkahub.data.grok.GrokAccountRepository
-import me.rerere.rikkahub.data.grok.GrokCredentialStore
-import me.rerere.rikkahub.data.grok.GrokOAuthManager
-import me.rerere.rikkahub.data.grok.GrokProvider
 import me.rerere.rikkahub.data.gemini.GeminiAccountRepository
 import me.rerere.rikkahub.data.gemini.GeminiCredentialStore
 import me.rerere.rikkahub.data.gemini.GeminiOAuthManager
 import me.rerere.rikkahub.data.gemini.GeminiProvider
-import me.rerere.rikkahub.data.remote.RemoteFileStore
-import me.rerere.rikkahub.data.sync.BackupManager
-import me.rerere.rikkahub.data.db.AppDatabaseFactory
-import me.rerere.rikkahub.data.db.AppDatabase
-import me.rerere.rikkahub.data.db.fts.MessageFtsManager
+import me.rerere.rikkahub.data.grok.GrokAccountRepository
+import me.rerere.rikkahub.data.grok.GrokCredentialStore
+import me.rerere.rikkahub.data.grok.GrokOAuthManager
+import me.rerere.rikkahub.data.grok.GrokProvider
 import me.rerere.rikkahub.data.ai.mcp.McpManager
-import me.rerere.rikkahub.data.remote.SettingsProxySelector
+import me.rerere.rikkahub.data.ai.transformers.AssistantTemplateLoader
+import me.rerere.rikkahub.data.ai.transformers.TemplateTransformer
+import me.rerere.rikkahub.data.datastore.SettingsStore
+import me.rerere.rikkahub.data.db.AppDatabase
+import me.rerere.rikkahub.data.db.AppDatabaseFactory
+import me.rerere.rikkahub.data.db.fts.MessageFtsManager
+import me.rerere.rikkahub.data.remote.RemoteFileStore
+import me.rerere.rikkahub.data.remote.RikkaHubAPI
 import me.rerere.rikkahub.data.remote.SettingsProxyAuthenticator
+import me.rerere.rikkahub.data.remote.SettingsProxySelector
 import me.rerere.rikkahub.data.remote.SettingsSocks5Authenticator
-import me.rerere.rikkahub.data.sync.webdav.WebDavSync
-import me.rerere.search.SearchService
+import me.rerere.rikkahub.data.remote.SponsorAPI
+import me.rerere.rikkahub.data.sync.BackupManager
 import me.rerere.rikkahub.data.sync.S3Sync
+import me.rerere.rikkahub.data.sync.webdav.WebDavSync
+import me.rerere.rikkahub.service.memoryDreamKeepAlive
+import me.rerere.search.SearchService
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
-import me.rerere.rikkahub.service.memoryDreamKeepAlive
 import org.koin.dsl.module
 import org.koin.core.qualifier.named
 import retrofit2.Retrofit
@@ -144,22 +146,23 @@ val dataSourceModule = module {
     }
 
     single {
+        get<AppDatabase>().usageRecordDao()
+    }
+
+    single {
+        UsageRecorder(dao = get(), scope = get<AppScope>())
+    }
+
+    single {
         MessageFtsManager(get())
     }
 
     single { McpManager(settingsStore = get(), appScope = get(), filesManager = get()) }
 
     single {
-        GenerationLoop(
-            context = get(),
-            providerManager = get(),
-            json = get(),
-        )
-    }
-
-    single {
         MemoryConsolidator(
-            generationLoop = get(),
+            providerManager = get(),
+            usageRecorder = get(),
             memoryRepository = get(),
             conversationRepo = get(),
             consolidationDao = get(),
@@ -177,7 +180,11 @@ val dataSourceModule = module {
     }
 
     single {
-        TranslationHandler(providerManager = get())
+        TranslationHandler(providerManager = get(), usageRecorder = get())
+    }
+
+    single {
+        ConversationMetaGenerator(context = get(), providerManager = get(), usageRecorder = get())
     }
 
     single {
@@ -333,8 +340,21 @@ val dataSourceModule = module {
         SponsorAPI.create(get())
     }
 
+    single {
+        ProviderAccountManager(
+            settingsStore = get(),
+            appScope = get(),
+            client = get(),
+        )
+    }
+
     single<ProviderManager> {
-        ProviderManager(client = get(), context = get()).also { manager ->
+        ProviderManager(
+            client = get(),
+            context = get(),
+            accountCredentials = get<ProviderAccountManager>(),
+        ).also { manager ->
+            // Keep the custom multi-account OAuth integrations alongside upstream ChatGPT OAuth.
             manager.registerProvider(
                 "codex",
                 CodexProvider(

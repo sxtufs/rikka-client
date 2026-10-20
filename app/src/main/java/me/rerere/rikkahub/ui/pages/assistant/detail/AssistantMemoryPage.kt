@@ -8,6 +8,7 @@ import me.rerere.hugeicons.stroke.Brain02
 import me.rerere.hugeicons.stroke.Delete01
 import me.rerere.hugeicons.stroke.Settings03
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -51,13 +54,14 @@ import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.MemoryFile
 import me.rerere.rikkahub.data.model.groupByDirectory
 import me.rerere.rikkahub.data.model.memoryTitleOf
+import kotlinx.coroutines.launch
+import me.rerere.rikkahub.ui.components.ai.ExtensionEmptyState
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.components.ui.CardGroup
 import me.rerere.rikkahub.ui.components.ui.ItemAction
 import me.rerere.rikkahub.ui.components.ui.ItemActionMenu
 import me.rerere.rikkahub.ui.components.ui.PagerTab
 import me.rerere.rikkahub.ui.components.ui.PagerTabs
-import me.rerere.rikkahub.ui.components.ui.RabbitLoadingIndicator
 import me.rerere.rikkahub.ui.components.ui.switchItem
 import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.pages.memory.resultText
@@ -93,6 +97,7 @@ fun AssistantMemoryPage(id: String) {
     val navController = LocalNavController.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val pagerState = rememberPagerState { MemoryTab.entries.size }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -142,6 +147,9 @@ fun AssistantMemoryPage(id: String) {
                         onOrganizeMemory = { vm.organizeMemory() },
                         onOpenMemory = { path -> navController.navigate(Screen.MemoryFile(vm.memoryId, path)) },
                         onDeleteMemory = { vm.deleteMemory(it) },
+                        onOpenSettings = {
+                            scope.launch { pagerState.animateScrollToPage(MemoryTab.SETTINGS.ordinal) }
+                        },
                     )
 
                     MemoryTab.SETTINGS -> MemorySettingsTab(
@@ -233,6 +241,19 @@ private fun MemorySettingsTab(
                 headlineContent = { Text(stringResource(R.string.assistant_page_global_memory)) },
             )
             switchItem(
+                checked = assistant.autoConsolidateMemory,
+                onCheckedChange = {
+                    onUpdateAssistant(
+                        assistant.copy(
+                            autoConsolidateMemory = it
+                        )
+                    )
+                },
+                enabled = assistant.enableMemory,
+                supportingContent = { Text(stringResource(R.string.assistant_page_memory_auto_dream_desc)) },
+                headlineContent = { Text(stringResource(R.string.assistant_page_memory_auto_dream)) },
+            )
+            switchItem(
                 checked = assistant.enableRecentChatsReference,
                 onCheckedChange = {
                     onUpdateAssistant(
@@ -291,9 +312,43 @@ private fun MemoryFilesTab(
     onOrganizeMemory: () -> Unit,
     onOpenMemory: (path: String) -> Unit,
     onDeleteMemory: (MemoryFile) -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     var pendingDeleteMemory by remember { mutableStateOf<MemoryFile?>(null) }
     val memoryGroups = remember(memories) { memories.groupByDirectory() }
+
+    // 空列表不滚动，占位才能在剩余空间里居中
+    if (memoryGroups.isEmpty()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (consolidation != null) {
+                MemoryConsolidationSection(
+                    status = consolidation,
+                    onOrganize = onOrganizeMemory,
+                )
+            }
+            Box(modifier = Modifier.weight(1f)) {
+                ExtensionEmptyState(
+                    message = stringResource(R.string.assistant_page_memory_empty),
+                    description = stringResource(
+                        if (consolidation != null) {
+                            R.string.assistant_page_memory_empty_hint
+                        } else {
+                            R.string.assistant_page_memory_empty_disabled_hint
+                        }
+                    ),
+                    buttonText = stringResource(R.string.settings).takeIf { consolidation == null },
+                    onAction = onOpenSettings,
+                    icon = HugeIcons.Brain02,
+                )
+            }
+        }
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -393,7 +448,7 @@ private fun MemoryConsolidationSection(
             supportingContent = { Text(memoryConsolidationSummary(status)) },
             trailingContent = {
                 if (status.running) {
-                    RabbitLoadingIndicator(modifier = Modifier.size(32.dp))
+                    ContainedLoadingIndicator(modifier = Modifier.size(32.dp))
                 } else {
                     FilledTonalButton(onClick = onOrganize) {
                         Text(

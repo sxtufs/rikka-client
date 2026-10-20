@@ -671,6 +671,8 @@ object ChatboxImporter {
         is ProviderSetting.OpenAI -> "openai|${provider.baseUrl.trimEnd('/')}|${provider.apiKey}"
         is ProviderSetting.Google -> "google|${provider.baseUrl.trimEnd('/')}|${provider.apiKey}"
         is ProviderSetting.Claude -> "claude|${provider.baseUrl.trimEnd('/')}|${provider.apiKey}"
+        // OAuth/account providers are never imported from external backups; identify them by id.
+        is ProviderSetting.Account -> "account|${provider.id}"
         is ProviderSetting.Codex -> "codex|${provider.id}"
         is ProviderSetting.Grok -> "grok|${provider.id}"
         is ProviderSetting.GeminiOAuth -> "gemini_oauth|${provider.id}"
@@ -680,6 +682,7 @@ object ChatboxImporter {
         is ProviderSetting.OpenAI -> "openai"
         is ProviderSetting.Google -> "gemini"
         is ProviderSetting.Claude -> "claude"
+        is ProviderSetting.ChatGPT -> "chatgpt"
         is ProviderSetting.Codex -> "codex"
         is ProviderSetting.Grok -> "grok"
         is ProviderSetting.GeminiOAuth -> "gemini_oauth"

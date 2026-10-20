@@ -121,16 +121,6 @@ fun SettingPreferencesGeneralPage(vm: SettingVM = koinViewModel()) {
             item {
                 CardGroup {
                     switchItem(
-                        checked = displaySetting.useAppIconStyleLoadingIndicator,
-                        onCheckedChange = {
-                            updateDisplaySetting(displaySetting.copy(useAppIconStyleLoadingIndicator = it))
-                        },
-                        supportingContent = {
-                            Text(stringResource(R.string.setting_display_page_use_app_icon_style_loading_indicator_desc))
-                        },
-                        headlineContent = { Text(stringResource(R.string.setting_display_page_use_app_icon_style_loading_indicator_title)) },
-                    )
-                    switchItem(
                         checked = displaySetting.enableBlurEffect,
                         onCheckedChange = { updateDisplaySetting(displaySetting.copy(enableBlurEffect = it)) },
                         supportingContent = { Text(stringResource(R.string.setting_display_page_background_effect_desc)) },
@@ -266,6 +256,12 @@ fun SettingPreferencesGeneralPage(vm: SettingVM = koinViewModel()) {
                         onCheckedChange = { updateDisplaySetting(displaySetting.copy(autoPlayTTSAfterGeneration = it)) },
                         supportingContent = { Text(stringResource(R.string.setting_display_page_auto_play_tts_desc)) },
                         headlineContent = { Text(stringResource(R.string.setting_display_page_auto_play_tts_title)) },
+                    )
+                    switchItem(
+                        checked = displaySetting.voiceModeListenWhileReplying,
+                        onCheckedChange = { updateDisplaySetting(displaySetting.copy(voiceModeListenWhileReplying = it)) },
+                        supportingContent = { Text(stringResource(R.string.setting_display_page_voice_listen_while_replying_desc)) },
+                        headlineContent = { Text(stringResource(R.string.setting_display_page_voice_listen_while_replying_title)) },
                     )
                 }
             }

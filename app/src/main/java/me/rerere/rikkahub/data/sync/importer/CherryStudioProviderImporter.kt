@@ -126,6 +126,8 @@ object CherryStudioProviderImporter {
             is ProviderSetting.OpenAI -> "openai|${provider.baseUrl}|${provider.apiKey}"
             is ProviderSetting.Google -> "google|${provider.baseUrl}|${provider.apiKey}"
             is ProviderSetting.Claude -> "claude|${provider.baseUrl}|${provider.apiKey}"
+            // OAuth/account providers are never imported from external backups; identify them by id.
+            is ProviderSetting.Account -> "account|${provider.id}"
             is ProviderSetting.Codex -> "codex|${provider.id}"
             is ProviderSetting.Grok -> "grok|${provider.id}"
             is ProviderSetting.GeminiOAuth -> "gemini_oauth|${provider.id}"
