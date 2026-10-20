@@ -484,7 +484,7 @@ private fun handleImageQRCode(
 @Composable
 private fun AddButton(onAdd: (ProviderSetting) -> Unit) {
     var showSheet by remember { mutableStateOf(false) }
-    val templates = remember {
+    val templates: List<ProviderSetting> = remember {
         listOf(
             ProviderSetting.OpenAI(),
             ProviderSetting.Google(),
