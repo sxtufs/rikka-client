@@ -108,6 +108,7 @@ fun ProviderSetting.convertTo(type: KClass<out ProviderSetting>): ProviderSettin
         ProviderSetting.OpenAI::class -> ProviderSetting.OpenAI().baseUrl
         ProviderSetting.Google::class -> ProviderSetting.Google().baseUrl
         ProviderSetting.Claude::class -> ProviderSetting.Claude().baseUrl
+        ProviderSetting.ChatGPT::class -> error("ChatGPT provider removed; use Codex")
         ProviderSetting.Codex::class,
         ProviderSetting.Grok::class,
         ProviderSetting.GeminiOAuth::class -> error("OAuth providers cannot be converted to API-key providers")
@@ -134,6 +135,7 @@ fun ProviderSetting.convertTo(type: KClass<out ProviderSetting>): ProviderSettin
             description = this.description, shortDescription = this.shortDescription,
             apiKey = apiKey, baseUrl = convertedBaseUrl
         )
+        ProviderSetting.ChatGPT::class -> error("ChatGPT provider removed; use Codex")
         ProviderSetting.Codex::class,
         ProviderSetting.Grok::class,
         ProviderSetting.GeminiOAuth::class -> error("OAuth providers cannot be converted to API-key providers")
