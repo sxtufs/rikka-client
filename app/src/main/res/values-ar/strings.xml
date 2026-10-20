@@ -1728,4 +1728,5 @@
   <string name="setting_provider_page_balance_api_path">مسار API للرصيد</string>
   <string name="chat_page_compress_keep_recent">الاحتفاظ بأحدث الرسائل</string>
   <string name="chat_page_compress_keep_recent_desc">لا تشارك هذه الرسائل في الضغط وتبقى كما هي بعد الملخص. استخدم 0 لضغط جميع الرسائل.</string>
+  <string name="chat_page_compress_not_enough_messages">لا توجد رسائل كافية للضغط، قلّل عدد الرسائل المحتفظ بها.</string>
 </resources>

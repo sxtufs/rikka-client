@@ -1730,4 +1730,5 @@ mDNS 주소: .local 호스트네임을 사용하며, IP를 몰라도 같은 네�
   <string name="setting_provider_page_balance_api_path">잔액 API 경로</string>
   <string name="chat_page_compress_keep_recent">최근 메시지 보존</string>
   <string name="chat_page_compress_keep_recent_desc">이 메시지들은 압축에 포함되지 않고 요약 뒤에 원문 그대로 유지됩니다. 모든 메시지를 압축하려면 0을 입력하세요.</string>
+  <string name="chat_page_compress_not_enough_messages">압축할 메시지가 충분하지 않습니다. 보존할 메시지 수를 줄여 주세요.</string>
 </resources>

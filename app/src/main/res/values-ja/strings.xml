@@ -1730,4 +1730,5 @@ mDNSアドレス: .localホスト名を使用し、IPを知らなくても同じ
   <string name="setting_provider_page_balance_api_path">残高 API パス</string>
   <string name="chat_page_compress_keep_recent">最近のメッセージを保持</string>
   <string name="chat_page_compress_keep_recent_desc">これらのメッセージは圧縮されず、要約の後にそのまま保持されます。すべてのメッセージを圧縮するには 0 を入力してください。</string>
+  <string name="chat_page_compress_not_enough_messages">圧縮できるメッセージが足りません。保持するメッセージ数を減らしてください。</string>
 </resources>
