@@ -1727,4 +1727,5 @@
   <string name="image_preview_saving">Сохранение…</string>
   <string name="image_preview_saved">Изображение сохранено</string>
   <string name="setting_provider_page_grok_disclaimer">Использует вашу подписку SuperGrok, выполняя вход так же, как в Grok CLI. Экспериментально: xAI может в любое время изменить или ограничить эту функцию.</string>
+  <string name="setting_provider_page_balance_api_path">Путь API баланса</string>
 </resources>

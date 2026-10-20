@@ -1730,4 +1730,5 @@ mDNS 地址：使用 .local 主机名，同一网络中的其他设备可通过�
   <string name="image_preview_saving">保存中…</string>
   <string name="image_preview_saved">图片已保存</string>
   <string name="setting_provider_page_grok_disclaimer">以 Grok CLI 的方式登录，使用你的 SuperGrok 订阅。实验性功能：xAI 可能随时更改或限制此功能。</string>
+  <string name="setting_provider_page_balance_api_path">余额 API 路径</string>
 </resources>

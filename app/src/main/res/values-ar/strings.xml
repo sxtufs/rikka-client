@@ -1725,4 +1725,5 @@
   <string name="image_preview_saving">جارٍ الحفظ…</string>
   <string name="image_preview_saved">تم حفظ الصورة</string>
   <string name="setting_provider_page_grok_disclaimer">يستخدم اشتراك SuperGrok الخاص بك عبر تسجيل الدخول كما في Grok CLI. ميزة تجريبية: قد تغيّر xAI هذا أو تقيّده في أي وقت.</string>
+  <string name="setting_provider_page_balance_api_path">مسار API للرصيد</string>
 </resources>

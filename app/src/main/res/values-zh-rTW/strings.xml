@@ -1725,4 +1725,5 @@
   <string name="image_preview_saving">儲存中…</string>
   <string name="image_preview_saved">圖片已儲存</string>
   <string name="setting_provider_page_grok_disclaimer">以 Grok CLI 的方式登入，使用你的 SuperGrok 訂閱。實驗性功能：xAI 可能隨時變更或限制此功能。</string>
+  <string name="setting_provider_page_balance_api_path">餘額 API 路徑</string>
 </resources>
