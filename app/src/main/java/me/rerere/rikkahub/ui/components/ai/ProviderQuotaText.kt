@@ -45,10 +45,12 @@ private val cache = SimpleCache.builder<String, ProviderQuota>()
 fun rememberProviderQuota(providerSetting: ProviderSetting): Result<ProviderQuota>? {
     val providerManager = koinInject<ProviderManager>()
     // 查询配置或登录的账号变了要重新查
-    val cacheKey = "${providerSetting.id}," + when (providerSetting) {
-        is ProviderSetting.ApiKey -> providerSetting.quotaQuery.hashCode()
-        is ProviderSetting.Account -> providerSetting.credential?.accountId
+    val providerVariant = when (providerSetting) {
+        is ProviderSetting.ApiKey -> providerSetting.quotaQuery.hashCode().toString()
+        is ProviderSetting.Account -> providerSetting.credential?.accountId.orEmpty()
+        else -> providerSetting::class.qualifiedName.orEmpty()
     }
+    val cacheKey = "${providerSetting.id},$providerVariant"
     val quota by produceState(
         initialValue = cache.getIfPresent(cacheKey)?.let { Result.success(it) },
         cacheKey,
