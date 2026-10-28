@@ -57,6 +57,46 @@ class GeminiProviderErrorDetailTest {
     }
 
     @Test
+    fun `VALIDATION_REQUIRED exposes the nested metadata validation URL`() {
+        val body = """
+            {
+              "error": {
+                "code": 403,
+                "message": "Verify your account to continue.",
+                "status": "PERMISSION_DENIED",
+                "details": [
+                  {
+                    "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                    "reason": "VALIDATION_REQUIRED",
+                    "domain": "cloudcode-pa.googleapis.com",
+                    "metadata": {
+                      "validation_error_message": "Verify your account to continue.",
+                      "validation_url": "https://accounts.google.com/verify?continue=opaque"
+                    }
+                  }
+                ]
+              }
+            }
+        """.trimIndent()
+        val message = parse(body)
+        assertTrue(message?.contains("reason=VALIDATION_REQUIRED") == true)
+        assertTrue(message?.contains("verification URL: https://accounts.google.com/verify?continue=opaque") == true)
+    }
+
+    @Test
+    fun `VALIDATION_REQUIRED without a URL keeps the existing error formatting`() {
+        val body = """
+            {"error":{"code":403,"message":"Verify your account to continue.","status":"PERMISSION_DENIED",
+            "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"VALIDATION_REQUIRED",
+            "domain":"cloudcode-pa.googleapis.com","metadata":{"validation_url":""}}]}}
+        """.trimIndent()
+        val message = parse(body)
+        assertTrue(message?.contains("Cloud Code Assist error (403): Verify your account to continue.") == true)
+        assertTrue(message?.contains("reason=VALIDATION_REQUIRED") == true)
+        assertTrue(message?.contains("verification URL:") == false)
+    }
+
+    @Test
     fun `a non-BadRequest detail renders its type plus scalar fields`() {
         val body = """
             {

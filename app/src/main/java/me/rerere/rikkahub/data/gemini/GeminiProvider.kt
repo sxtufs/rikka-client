@@ -213,8 +213,9 @@ class GeminiProvider(
                         resumeOnce(
                             GeminiStreamAttemptOutcome.Failure(
                                 cause = IllegalStateException(
-                                    "Cloud Code Assist error: " +
-                                        (error["message"]?.jsonPrimitive?.contentOrNull ?: "unknown")
+                                    parseErrorMessage(data, json)
+                                        ?: "Cloud Code Assist error: " +
+                                            (error["message"]?.jsonPrimitive?.contentOrNull ?: "unknown")
                                 ),
                                 emitted = emitted,
                                 classification = classifyGeminiError(null, data, json),
@@ -464,8 +465,9 @@ private fun mapAvailableModels(body: String, json: Json): List<Model> {
  * Renders `error.status` and a flattened `error.details[]` for appending after the existing
  * `Cloud Code Assist error (code): message` prefix. `BadRequest` detail entries surface each
  * `fieldViolations[]` entry's `field` and `description` - that is the whole point, since that is
- * where Google names the invalid argument. Other detail entries render as their `@type` plus
- * whatever scalar fields they carry. Any unexpected shape (wrong types, missing keys) is skipped
+ * where Google names the invalid argument. `VALIDATION_REQUIRED` ErrorInfo entries also expose
+ * their nested `metadata.validation_url` when it is present. Other detail entries render as their
+ * `@type` plus whatever scalar fields they carry. Any unexpected shape (wrong types, missing keys) is skipped
  * rather than thrown, so a malformed body degrades to just the prefix.
  */
 private fun formatErrorDetail(error: JsonObject): String {
@@ -480,6 +482,14 @@ private fun formatErrorDetail(error: JsonObject): String {
     }
     if (parts.isEmpty()) return ""
     return " (" + parts.joinToString("; ") + ")"
+}
+
+private fun validationUrlFromDetail(entry: JsonObject): String? {
+    if ((entry["reason"] as? JsonPrimitive)?.contentOrNull != "VALIDATION_REQUIRED") return null
+    val metadataUrl = ((entry["metadata"] as? JsonObject)?.get("validation_url") as? JsonPrimitive)
+        ?.contentOrNull
+        ?.takeIf { it.isNotBlank() }
+    return metadataUrl
 }
 
 private fun formatDetailEntry(entry: JsonObject): String? {
@@ -501,12 +511,18 @@ private fun formatDetailEntry(entry: JsonObject): String? {
     val scalars = entry.entries
         .filter { it.key != "@type" && it.key != "fieldViolations" }
         .mapNotNull { (key, value) -> (value as? JsonPrimitive)?.contentOrNull?.let { "$key=$it" } }
-    if (type == null && scalars.isEmpty()) return null
+    val validationUrl = validationUrlFromDetail(entry)
+    if (type == null && scalars.isEmpty() && validationUrl == null) return null
     return buildString {
         append(type ?: "unknown detail type")
         if (scalars.isNotEmpty()) {
             append(": ")
             append(scalars.joinToString(", "))
+        }
+        validationUrl?.let {
+            if (scalars.isEmpty()) append(": ") else append(", ")
+            append("verification URL: ")
+            append(it)
         }
     }
 }
