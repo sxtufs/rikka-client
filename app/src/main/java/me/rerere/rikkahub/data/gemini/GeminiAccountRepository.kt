@@ -94,6 +94,7 @@ class GeminiAccountRepository internal constructor(
 
     suspend fun acquireAccount(): GeminiAccount = mutex.withLock {
         if (state.accounts.isEmpty()) error("No Google account is signed in")
+        var lastRefreshFailure: Throwable? = null
         repeat(state.accounts.size) {
             val index = selectGeminiAccountIndex(
                 accounts = state.accounts,
@@ -101,10 +102,13 @@ class GeminiAccountRepository internal constructor(
             ) ?: error("No available Google account")
             val candidate = state.accounts[index]
             updateState(state.copy(nextAccountIndex = (index + 1) % state.accounts.size))
-            val fresh = runCatching { ensureFreshLocked(candidate) }.getOrNull() ?: return@repeat
+            val fresh = runCatching { ensureFreshLocked(candidate) }
+                .onFailure { lastRefreshFailure = it }
+                .getOrNull()
+                ?: return@repeat
             return fresh
         }
-        error("No available Google account")
+        throw lastRefreshFailure ?: IllegalStateException("No available Google account")
     }
 
     suspend fun setEnabled(accountId: String, enabled: Boolean) = mutex.withLock {
@@ -199,7 +203,10 @@ class GeminiAccountRepository internal constructor(
             if (outcome.code == 401) {
                 replaceAccount(account.id) { it.copy(tokenStatus = GeminiTokenStatus.INVALID) }
             }
-            error("Failed to fetch Gemini usage: ${outcome.code} ${outcome.body}")
+            error(
+                "Failed to fetch Gemini usage: ${outcome.code} " +
+                    (parseErrorMessage(outcome.body, json) ?: "Cloud Code Assist request failed"),
+            )
         }
         val snapshot = parseGeminiQuotaUsage(json.parseToJsonElement(outcome.body).jsonObject)
         if (snapshot == null) {
@@ -260,7 +267,10 @@ class GeminiAccountRepository internal constructor(
         ).await()
         val loadBody = loadResponse.body.string()
         if (!loadResponse.isSuccessful) {
-            error("loadCodeAssist failed: ${loadResponse.code} $loadBody")
+            error(
+                "loadCodeAssist failed: ${loadResponse.code} " +
+                    (parseErrorMessage(loadBody, json) ?: "Cloud Code Assist request failed"),
+            )
         }
         val load = json.parseToJsonElement(loadBody).jsonObject
 
@@ -291,7 +301,10 @@ class GeminiAccountRepository internal constructor(
             ).await()
             val body = response.body.string()
             if (!response.isSuccessful) {
-                error("onboardUser failed: ${response.code} $body")
+                error(
+                    "onboardUser failed: ${response.code} " +
+                        (parseErrorMessage(body, json) ?: "Cloud Code Assist request failed"),
+                )
             }
             val parsed = json.parseToJsonElement(body).jsonObject
             operation = parsed
@@ -611,6 +624,15 @@ internal fun classifyGeminiError(statusCode: Int?, body: String?, json: Json): G
     )
 }
 
+/**
+ * Daily/sandbox Code Assist hosts are not public API and can be retired independently. A 404/405
+ * from a non-final host means that host cannot serve this request; it is safe to try the next host.
+ * Authentication and account-policy failures (401/403) remain terminal and are never masked by
+ * endpoint fallback.
+ */
+internal fun shouldFallbackGeminiEndpoint(classification: GeminiErrorClassification, isLastEndpoint: Boolean): Boolean =
+    !isLastEndpoint && (classification.status == 404 || classification.status == 405)
+
 /** Parses a `google.rpc.RetryInfo.retryDelay` value such as `"12s"` or `"500ms"` into milliseconds. */
 internal fun parseGeminiRetryDelayMs(raw: String): Long? {
     val match = RETRY_DELAY_VALUE_PATTERN.find(raw.trim()) ?: return null
@@ -656,7 +678,10 @@ internal suspend fun OkHttpClient.postWithEndpointFallback(
             last = outcome
             if (outcome.successful) return outcome
             val classification = classifyGeminiError(outcome.code, outcome.body, json)
-            if (!classification.retryable) return outcome
+            if (!classification.retryable) {
+                if (shouldFallbackGeminiEndpoint(classification, isLastEndpoint)) break
+                return outcome
+            }
             if (attempt < maxAttempts - 1) {
                 delay(resolveGeminiRetryDelayMs(classification, attempt))
             }

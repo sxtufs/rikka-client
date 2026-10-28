@@ -84,7 +84,10 @@ class GeminiProvider(
         }
         if (!outcome.successful) {
             if (outcome.code == 401) repository.markInvalid(account.id)
-            error("Failed to list Gemini models: ${outcome.code} ${outcome.body}")
+            error(
+                "Failed to list Gemini models: ${outcome.code} " +
+                    (parseErrorMessage(outcome.body, json) ?: "Cloud Code Assist request failed"),
+            )
         }
         mapAvailableModels(outcome.body, json)
     }
@@ -161,7 +164,10 @@ class GeminiProvider(
 
                     is GeminiStreamAttemptOutcome.Failure -> {
                         lastFailure = outcome.cause
-                        if (outcome.emitted || !outcome.classification.retryable) {
+                        if (outcome.emitted ||
+                            (!outcome.classification.retryable &&
+                                !shouldFallbackGeminiEndpoint(outcome.classification, isLastEndpoint))
+                        ) {
                             close(outcome.cause)
                             break@endpointLoop
                         }
@@ -253,7 +259,7 @@ class GeminiProvider(
                         }
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "onEvent: failed to parse chunk, payload=${data.take(PAYLOAD_LOG_LIMIT)}", e)
+                    Log.w(TAG, "onEvent: failed to parse chunk, payload=${redactGeminiSensitiveData(data).take(PAYLOAD_LOG_LIMIT)}", e)
                 }
             }
 
@@ -290,6 +296,12 @@ class GeminiProvider(
         const val PAYLOAD_LOG_LIMIT = 500
     }
 }
+
+private val GEMINI_URL_PATTERN = Regex("""https?://[^"\s]+""")
+
+/** Removes bearer/verification URLs from diagnostic logs while keeping user-facing errors intact. */
+internal fun redactGeminiSensitiveData(value: String): String =
+    value.replace(GEMINI_URL_PATTERN, "[redacted URL]")
 
 private const val TAG = "GeminiProvider"
 
@@ -406,7 +418,7 @@ internal class GeminiStreamChunkAdapter {
 // bounds streamed candidate text. Caps the rendered error detail appended to the thrown message.
 private const val ERROR_DETAIL_LOG_LIMIT = 2000
 
-private fun parseErrorMessage(body: String?, json: Json): String? {
+internal fun parseErrorMessage(body: String?, json: Json): String? {
     if (body.isNullOrBlank()) return null
     return runCatching {
         val error = json.parseToJsonElement(body).jsonObject["error"]?.jsonObject

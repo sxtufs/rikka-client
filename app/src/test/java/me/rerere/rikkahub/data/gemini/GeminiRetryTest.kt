@@ -234,6 +234,40 @@ class GeminiRetryTest {
         assertNull(classification.retryDelayMs)
     }
 
+    // --- endpoint fallback -------------------------------------------------------------------
+
+    @Test
+    fun `an unavailable non-final Code Assist host falls through to the next host`() {
+        assertTrue(
+            shouldFallbackGeminiEndpoint(
+                GeminiErrorClassification(404, null, null, retryable = false),
+                isLastEndpoint = false,
+            )
+        )
+        assertTrue(
+            shouldFallbackGeminiEndpoint(
+                GeminiErrorClassification(405, null, null, retryable = false),
+                isLastEndpoint = false,
+            )
+        )
+    }
+
+    @Test
+    fun `authentication and policy failures never fall through to another host`() {
+        assertFalse(
+            shouldFallbackGeminiEndpoint(
+                GeminiErrorClassification(401, null, null, retryable = false),
+                isLastEndpoint = false,
+            )
+        )
+        assertFalse(
+            shouldFallbackGeminiEndpoint(
+                GeminiErrorClassification(403, "PERMISSION_DENIED", null, retryable = false),
+                isLastEndpoint = false,
+            )
+        )
+    }
+
     // --- resolveGeminiRetryDelayMs -----------------------------------------------------------
 
     @Test

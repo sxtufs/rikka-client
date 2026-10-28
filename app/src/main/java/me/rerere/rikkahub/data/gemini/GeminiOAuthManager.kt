@@ -101,6 +101,7 @@ class GeminiOAuthManager(
                             val callbackState = call.request.queryParameters["state"]
                             val code = call.request.queryParameters["code"]
                             val error = call.request.queryParameters["error"]
+                            val errorDescription = call.request.queryParameters["error_description"]
                             val redirectUri = callbackState?.let(sessions::remove)
                             when {
                                 redirectUri == null -> {
@@ -108,7 +109,8 @@ class GeminiOAuthManager(
                                     call.respondText(callbackPage(false), ContentType.Text.Html)
                                 }
                                 !error.isNullOrBlank() -> {
-                                    _status.value = GeminiOAuthStatus.Error(error)
+                                    val message = listOfNotNull(error, errorDescription).joinToString(": ")
+                                    _status.value = GeminiOAuthStatus.Error(message)
                                     call.respondText(callbackPage(false), ContentType.Text.Html)
                                 }
                                 code.isNullOrBlank() -> {
@@ -123,7 +125,11 @@ class GeminiOAuthManager(
                                             val account = exchangeCode(code, redirectUri)
                                             _status.value = GeminiOAuthStatus.Success(account.id)
                                         } catch (error: Throwable) {
-                                            Log.e(TAG, "OAuth token exchange failed: ${error::class.java.name}: ${error.message}", error)
+                                            Log.e(
+                                                TAG,
+                                                "OAuth token exchange failed: ${error::class.java.name}: " +
+                                                    redactGeminiSensitiveData(error.message.orEmpty()),
+                                            )
                                             _status.value = GeminiOAuthStatus.Error(error.message ?: "OAuth token exchange failed")
                                         }
                                     }
@@ -149,11 +155,21 @@ class GeminiOAuthManager(
         suspendCancellableCoroutine { continuation ->
             lateinit var callback: ConnectivityManager.NetworkCallback
             callback = object : ConnectivityManager.NetworkCallback() {
-                override fun onBlockedStatusChanged(network: Network, blocked: Boolean) {
-                    if (!blocked && continuation.isActive) {
+                fun resumeWhenReady() {
+                    if (continuation.isActive) {
                         runCatching { connectivityManager.unregisterNetworkCallback(callback) }
                         continuation.resume(Unit)
                     }
+                }
+
+                override fun onAvailable(network: Network) {
+                    // A callback registered after the network is already available may not
+                    // receive a separate unblocked transition; do not leave login suspended.
+                    resumeWhenReady()
+                }
+
+                override fun onBlockedStatusChanged(network: Network, blocked: Boolean) {
+                    if (!blocked) resumeWhenReady()
                 }
             }
             continuation.invokeOnCancellation {

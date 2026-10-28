@@ -9,7 +9,7 @@ import org.junit.Test
 /**
  * Covers `parseErrorMessage`'s rendering of `error.status` and `error.details[]`
  * (`fieldViolations` in particular) for Cloud Code Assist's `INVALID_ARGUMENT` responses. It is a
- * file-private top-level function, so reflection targets the `GeminiProviderKt` facade class like
+ * top-level function, so reflection targets the `GeminiProviderKt` facade class like
  * [GeminiProviderRequestTest].
  */
 class GeminiProviderErrorDetailTest {
@@ -140,6 +140,15 @@ class GeminiProviderErrorDetailTest {
         """.trimIndent()
         val message = parse(body)
         assertTrue(message?.startsWith("Cloud Code Assist error (400): invalid argument") == true)
+    }
+
+    @Test
+    fun `diagnostic redaction removes verification URL query data`() {
+        val redacted = redactGeminiSensitiveData(
+            "validation_url=https://accounts.google.com/verify?plt=temporary-token"
+        )
+        assertTrue(redacted.contains("[redacted URL]"))
+        assertTrue(!redacted.contains("temporary-token"))
     }
 
     @Test
