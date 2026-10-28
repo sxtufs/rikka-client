@@ -1,13 +1,29 @@
 package me.rerere.rikkahub.data.gemini
 
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import me.rerere.ai.core.InputSchema
+import me.rerere.ai.core.Tool
+import me.rerere.ai.provider.Model
+import me.rerere.ai.provider.ModelAbility
+import me.rerere.ai.provider.TextGenerationParams
+import me.rerere.ai.provider.providers.google.GoogleProvider
+import me.rerere.ai.ui.UIMessage
+import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -63,6 +79,112 @@ class GeminiProviderRequestTest {
         request["generationConfig"]?.jsonObject
             ?.get("thinkingConfig")?.jsonObject
             ?.get("thinkingBudget")?.jsonPrimitive?.intOrNull
+
+    private val googleProvider = GoogleProvider(OkHttpClient())
+
+    @Test
+    fun `Code Assist sanitizes every nested tool schema while preserving useful constraints`() {
+        val body = googleProvider.buildCompletionRequestBody(
+            messages = listOf(UIMessage.user("use the tools")),
+            params = TextGenerationParams(
+                model = Model(modelId = "claude-compatible", abilities = listOf(ModelAbility.TOOL)),
+                tools = listOf(complexSchemaTool("first"), complexSchemaTool("second")),
+            ),
+            safetyCategories = emptyList(),
+            sanitizeToolSchemas = true,
+        )
+
+        val declarations = body["tools"]!!.jsonArray.single()
+            .jsonObject["functionDeclarations"]!!.jsonArray
+        assertEquals(2, declarations.size)
+        declarations.forEach { declaration ->
+            val schema = declaration.jsonObject["parameters"]!!
+            assertNoUnsupportedSchemaKeywords(schema)
+            val payload = schema.jsonObject["properties"]!!.jsonObject["payload"]!!.jsonObject
+            assertEquals("object", payload["type"]!!.jsonPrimitive.content)
+            assertTrue(payload["required"]!!.jsonArray.map { it.jsonPrimitive.content }.contains("mode"))
+            assertFalse(payload["required"]!!.jsonArray.map { it.jsonPrimitive.content }.contains("missing"))
+            assertEquals(
+                listOf("fast", "safe"),
+                payload["properties"]!!.jsonObject["mode"]!!.jsonObject["enum"]!!.jsonArray
+                    .map { it.jsonPrimitive.content },
+            )
+        }
+    }
+
+    @Test
+    fun `Code Assist request path uses sanitized schemas instead of the original schema`() {
+        val body = googleProvider.buildCompletionRequestBody(
+            messages = listOf(UIMessage.user("call a tool")),
+            params = TextGenerationParams(
+                model = Model(modelId = "claude-compatible", abilities = listOf(ModelAbility.TOOL)),
+                tools = listOf(complexSchemaTool("schema_tool")),
+            ),
+            safetyCategories = emptyList(),
+            sanitizeToolSchemas = true,
+        )
+        val schema = body["tools"]!!.jsonArray.single()
+            .jsonObject["functionDeclarations"]!!.jsonArray.single()
+            .jsonObject["parameters"]!!.jsonObject
+        assertFalse(schema.containsKey("${'$'}schema"))
+        assertFalse(schema.toString().contains("anyOf"))
+        assertFalse(schema.toString().contains("additionalProperties"))
+    }
+
+    private fun complexSchemaTool(name: String) = Tool(
+        name = name,
+        description = "complex schema",
+        parameters = {
+            InputSchema.Obj(
+                properties = buildJsonObject {
+                    put("payload", buildJsonObject {
+                        put("type", "object")
+                        put("${'$'}schema", "https://json-schema.org/draft/2020-12/schema")
+                        putJsonArray("required") {
+                            add("mode")
+                            add("missing")
+                        }
+                        put("properties", buildJsonObject {
+                            put("mode", buildJsonObject {
+                                put("type", "string")
+                                putJsonArray("enum") {
+                                    add("fast")
+                                    add("safe")
+                                }
+                            })
+                            put("values", buildJsonObject {
+                                put("type", "array")
+                                put("items", buildJsonObject {
+                                    putJsonArray("anyOf") {
+                                        add(buildJsonObject { put("type", "string") })
+                                        add(buildJsonObject { put("type", "integer") })
+                                    }
+                                })
+                                put("additionalProperties", false)
+                            })
+                        })
+                    })
+                },
+                required = listOf("payload"),
+            )
+        },
+        execute = { emptyList() },
+    )
+
+    private fun assertNoUnsupportedSchemaKeywords(element: JsonElement) {
+        when (element) {
+            is JsonObject -> {
+                val unsupported = setOf(
+                    "anyOf", "oneOf", "allOf", "not", "if", "then", "else", "${'$'}schema",
+                    "${'$'}id", "${'$'}ref", "${'$'}defs", "additionalProperties", "patternProperties",
+                )
+                assertTrue(element.keys.intersect(unsupported).isEmpty())
+                element.values.forEach(::assertNoUnsupportedSchemaKeywords)
+            }
+            is JsonArray -> element.forEach(::assertNoUnsupportedSchemaKeywords)
+            else -> Unit
+        }
+    }
 
     @Test
     fun `a budget below Claude's floor is raised to 1024`() {

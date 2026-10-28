@@ -145,6 +145,19 @@ class GeminiRetryTest {
     }
 
     @Test
+    fun `a structured QuotaFailure makes 429 terminal instead of retrying blindly`() {
+        val body = """
+            {"error":{"code":429,"message":"resource exhausted","status":"RESOURCE_EXHAUSTED",
+            "details":[{"@type":"type.googleapis.com/google.rpc.QuotaFailure","violations":[
+              {"subject":"model","description":"per-model capacity limit"}
+            ]}]}}
+        """.trimIndent()
+        val classification = classifyGeminiError(429, body, json)
+        assertFalse(classification.retryable)
+        assertEquals("QUOTA_FAILURE", classification.reason)
+    }
+
+    @Test
     fun `a bare 429 with no structured detail is still retryable off the status alone`() {
         val classification = classifyGeminiError(429, """{"error":{"code":429,"message":"rate limited"}}""", json)
         assertTrue(classification.retryable)
@@ -282,6 +295,12 @@ class GeminiRetryTest {
         assertEquals(GEMINI_RETRY_BASE_DELAY_MS, resolveGeminiRetryDelayMs(classification, attempt = 0))
         assertEquals(GEMINI_RETRY_BASE_DELAY_MS * 2, resolveGeminiRetryDelayMs(classification, attempt = 1))
         assertEquals(GEMINI_RETRY_BASE_DELAY_MS * 4, resolveGeminiRetryDelayMs(classification, attempt = 2))
+    }
+
+    @Test
+    fun `an unhinted 429 waits at least the documented rate-limit minimum`() {
+        val classification = GeminiErrorClassification(429, "RATE_LIMIT_EXCEEDED", null, retryable = true)
+        assertEquals(GEMINI_RATE_LIMIT_MIN_DELAY_MS, resolveGeminiRetryDelayMs(classification, attempt = 0))
     }
 
     @Test

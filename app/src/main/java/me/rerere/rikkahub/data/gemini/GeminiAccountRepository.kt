@@ -543,6 +543,10 @@ internal fun selectGeminiAccountIndex(
 internal const val GEMINI_MAX_RETRIES = 3
 internal const val GEMINI_RETRY_BASE_DELAY_MS = 1_000L
 
+// Google recommends at least 30 seconds before retrying a 429 RESOURCE_EXHAUSTED response
+// when the server does not provide a more specific RetryInfo delay.
+internal const val GEMINI_RATE_LIMIT_MIN_DELAY_MS = 30_000L
+
 // oh-my-pi's RATE_LIMIT_BUDGET_MS (google-gemini-cli.ts:322) and LONG_RATE_LIMIT_DELAY_MS
 // (error/rate-limit.ts) name the same five-minute figure for two different purposes that both
 // apply here: the longest delay worth actually waiting out, and the delay past which a
@@ -551,6 +555,7 @@ internal const val GEMINI_RETRY_DELAY_CAP_MS = 5 * 60 * 1000L
 
 private const val GOOGLE_RPC_ERROR_INFO_TYPE = "type.googleapis.com/google.rpc.ErrorInfo"
 private const val GOOGLE_RPC_RETRY_INFO_TYPE = "type.googleapis.com/google.rpc.RetryInfo"
+private const val GOOGLE_RPC_QUOTA_FAILURE_TYPE = "type.googleapis.com/google.rpc.QuotaFailure"
 private val RETRY_DELAY_VALUE_PATTERN = Regex("""^([0-9.]+)(ms|s)$""")
 
 // oh-my-pi's ANTIGRAVITY_MODEL_QUOTA_PATTERN (error/rate-limit.ts:114): Cloud Code Assist reuses
@@ -597,9 +602,13 @@ internal fun classifyGeminiError(statusCode: Int?, body: String?, json: Json): G
         (effectiveStatus != null && effectiveStatus >= 500)
     val rpcStatus = error?.get("status")?.jsonPrimitive?.contentOrNull
     val details = (error?.get("details") as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+    val hasQuotaFailure = details.any {
+        it["@type"]?.jsonPrimitive?.contentOrNull == GOOGLE_RPC_QUOTA_FAILURE_TYPE
+    }
     var reason = if (rpcStatus?.uppercase() == "RESOURCE_EXHAUSTED") {
         details.firstOrNull { it["@type"]?.jsonPrimitive?.contentOrNull == GOOGLE_RPC_ERROR_INFO_TYPE }
             ?.get("reason")?.jsonPrimitive?.contentOrNull
+            ?: hasQuotaFailure.takeIf { it }?.let { "QUOTA_FAILURE" }
     } else {
         null
     }
@@ -608,12 +617,14 @@ internal fun classifyGeminiError(statusCode: Int?, body: String?, json: Json): G
         ANTIGRAVITY_MODEL_QUOTA_PATTERN.containsMatchIn(message)
     ) {
         reason = "QUOTA_EXHAUSTED"
+    } else if (reason == "RATE_LIMIT_EXCEEDED" && hasQuotaFailure) {
+        reason = "QUOTA_FAILURE"
     }
     val retryDelayMs = details
         .firstOrNull { it["@type"]?.jsonPrimitive?.contentOrNull == GOOGLE_RPC_RETRY_INFO_TYPE }
         ?.get("retryDelay")?.jsonPrimitive?.contentOrNull
         ?.let(::parseGeminiRetryDelayMs)
-    val quotaExhausted = reason == "QUOTA_EXHAUSTED" ||
+    val quotaExhausted = hasQuotaFailure || reason == "QUOTA_EXHAUSTED" ||
         (reason == "RATE_LIMIT_EXCEEDED" && retryDelayMs != null && retryDelayMs >= GEMINI_RETRY_DELAY_CAP_MS)
     val withinRetryBudget = retryDelayMs == null || retryDelayMs <= GEMINI_RETRY_DELAY_CAP_MS
     return GeminiErrorClassification(
@@ -644,7 +655,12 @@ internal fun parseGeminiRetryDelayMs(raw: String): Long? {
 /** The delay before the next retry attempt: the server's own hint if it gave one, else exponential backoff. */
 internal fun resolveGeminiRetryDelayMs(classification: GeminiErrorClassification, attempt: Int): Long {
     val backoff = GEMINI_RETRY_BASE_DELAY_MS * (1L shl attempt)
-    return (classification.retryDelayMs ?: backoff).coerceAtMost(GEMINI_RETRY_DELAY_CAP_MS)
+    val defaultDelay = if (classification.status == 429) {
+        maxOf(backoff, GEMINI_RATE_LIMIT_MIN_DELAY_MS)
+    } else {
+        backoff
+    }
+    return (classification.retryDelayMs ?: defaultDelay).coerceAtMost(GEMINI_RETRY_DELAY_CAP_MS)
 }
 
 /** The outcome of one Cloud Code Assist HTTP call, with the body always already drained to text. */

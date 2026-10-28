@@ -126,7 +126,12 @@ class GeminiProvider(
                     raiseThinkingBudgetToClaudeFloor(
                         stripThinkingConfigForGptOss(
                             params.model.modelId,
-                            wire.buildCompletionRequestBody(messages, params, CODE_ASSIST_SAFETY_CATEGORIES)
+                            wire.buildCompletionRequestBody(
+                                messages,
+                                params,
+                                CODE_ASSIST_SAFETY_CATEGORIES,
+                                sanitizeToolSchemas = true,
+                            )
                         )
                     )
                 )
@@ -425,7 +430,17 @@ internal fun parseErrorMessage(body: String?, json: Json): String? {
         val message = error?.get("message")?.jsonPrimitive?.contentOrNull ?: return null
         val code = error["code"]?.jsonPrimitive?.intOrNull
         val prefix = if (code != null) "Cloud Code Assist error ($code): $message" else message
-        prefix + formatErrorDetail(error).take(ERROR_DETAIL_LOG_LIMIT)
+        val classification = classifyGeminiError(code, body, json)
+        val category = when {
+            code == 429 && classification.reason == "RATE_LIMIT_EXCEEDED" ->
+                " (rate limit; this is not by itself evidence that subscription quota is exhausted)"
+            code == 429 && classification.reason in setOf("QUOTA_EXHAUSTED", "QUOTA_FAILURE") ->
+                " (backend reported a quota or model-capacity limit)"
+            code == 429 ->
+                " (resource exhausted; backend did not identify subscription quota exhaustion)"
+            else -> ""
+        }
+        prefix + category + formatErrorDetail(error).take(ERROR_DETAIL_LOG_LIMIT)
     }.getOrNull()
 }
 
@@ -520,9 +535,30 @@ private fun formatDetailEntry(entry: JsonObject): String? {
         return violations.joinToString("; ")
     }
     val type = (entry["@type"] as? JsonPrimitive)?.contentOrNull
+    val quotaViolations = if (type?.endsWith("QuotaFailure") == true) {
+        (entry["violations"] as? JsonArray)
+            ?.mapNotNull { violation ->
+                val objectViolation = violation as? JsonObject ?: return@mapNotNull null
+                val subject = (objectViolation["subject"] as? JsonPrimitive)?.contentOrNull
+                val description = (objectViolation["description"] as? JsonPrimitive)?.contentOrNull
+                listOfNotNull(subject?.let { "subject=$it" }, description?.let { "description=$it" })
+                    .takeIf { it.isNotEmpty() }
+                    ?.joinToString(", ")
+            }
+            .orEmpty()
+    } else {
+        emptyList()
+    }
+    val metadataScalars = (entry["metadata"] as? JsonObject)
+        ?.mapNotNull { (key, value) ->
+            if (key == "validation_url") null
+            else (value as? JsonPrimitive)?.contentOrNull?.let { "metadata.$key=$it" }
+        }
+        .orEmpty()
     val scalars = entry.entries
-        .filter { it.key != "@type" && it.key != "fieldViolations" }
-        .mapNotNull { (key, value) -> (value as? JsonPrimitive)?.contentOrNull?.let { "$key=$it" } }
+        .filter { it.key != "@type" && it.key != "fieldViolations" && it.key != "metadata" && it.key != "violations" }
+        .mapNotNull { (key, value) -> (value as? JsonPrimitive)?.contentOrNull?.let { "$key=$it" } } +
+        metadataScalars + quotaViolations
     val validationUrl = validationUrlFromDetail(entry)
     if (type == null && scalars.isEmpty() && validationUrl == null) return null
     return buildString {

@@ -143,6 +143,31 @@ class GeminiProviderErrorDetailTest {
     }
 
     @Test
+    fun `a 429 rate limit is not presented as exhausted subscription quota`() {
+        val body = """
+            {"error":{"code":429,"message":"try again later","status":"RESOURCE_EXHAUSTED",
+            "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo",
+            "reason":"RATE_LIMIT_EXCEEDED","domain":"cloudcode-pa.googleapis.com"}]}}
+        """.trimIndent()
+        val message = parse(body)
+        assertTrue(message?.contains("rate limit") == true)
+        assertTrue(message?.contains("not by itself evidence") == true)
+        assertTrue(message?.contains("quota is exhausted") == false)
+    }
+
+    @Test
+    fun `a structured quota failure is identified without relying on status alone`() {
+        val body = """
+            {"error":{"code":429,"message":"resource exhausted","status":"RESOURCE_EXHAUSTED",
+            "details":[{"@type":"type.googleapis.com/google.rpc.QuotaFailure","violations":[
+            {"subject":"model","description":"per-model capacity limit"}]}]}}
+        """.trimIndent()
+        val message = parse(body)
+        assertTrue(message?.contains("quota or model-capacity limit") == true)
+        assertTrue(message?.contains("per-model capacity limit") == true)
+    }
+
+    @Test
     fun `diagnostic redaction removes verification URL query data`() {
         val redacted = redactGeminiSensitiveData(
             "validation_url=https://accounts.google.com/verify?plt=temporary-token"

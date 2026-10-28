@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonArrayBuilder
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -102,6 +103,119 @@ val GOOGLE_SAFETY_CATEGORIES = listOf(
  * lists the category as allowed.
  */
 val CODE_ASSIST_SAFETY_CATEGORIES = GOOGLE_SAFETY_CATEGORIES - "HARM_CATEGORY_CIVIC_INTEGRITY"
+
+private val CODE_ASSIST_SCHEMA_SCALAR_KEYS = setOf(
+    "description", "minItems", "maxItems", "minLength", "maxLength", "pattern",
+    "minimum", "maximum", "nullable",
+)
+
+/**
+ * Converts application/MCP schemas to the conservative JSON-Schema subset accepted by the
+ * Claude-compatible Cloud Code Assist route. This is deliberately separate from the standard
+ * Gemini Developer API serializer: Code Assist and the Developer API do not share a schema
+ * contract even though both use Gemini-shaped function declarations.
+ *
+ * Unsupported composition keywords are structurally reduced rather than dropped blindly. Object
+ * unions merge their properties and keep only fields required by every branch; primitive unions
+ * retain their first concrete branch. This keeps useful validation while guaranteeing that
+ * `required` only names emitted properties and that tuple-style arrays do not reach the backend.
+ */
+internal fun sanitizeCodeAssistToolSchema(schema: JsonElement): JsonElement =
+    sanitizeCodeAssistSchema(schema)
+
+private fun sanitizeCodeAssistSchema(schema: JsonElement): JsonElement {
+    if (schema !is JsonObject) return schema
+
+    val alternatives = sequenceOf("anyOf", "oneOf")
+        .mapNotNull { key -> (schema[key] as? JsonArray)?.toList() }
+        .firstOrNull()
+    val base = if (alternatives != null) {
+        JsonObject(schema - "anyOf" - "oneOf" + mergeCodeAssistAlternatives(alternatives))
+    } else {
+        schema
+    }
+
+    val properties = (base["properties"] as? JsonObject)
+        ?.mapNotNull { (name, value) ->
+            (value as? JsonObject)?.let { name to sanitizeCodeAssistSchema(it) }
+        }
+        ?.toMap()
+        .orEmpty()
+    val result = linkedMapOf<String, JsonElement>()
+
+    val typeNames = when (val type = base["type"]) {
+        is JsonPrimitive -> type.contentOrNull?.let(::listOf).orEmpty()
+        is JsonArray -> type.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+        else -> emptyList()
+    }
+    val concreteTypes = typeNames.filterNot { it == "null" }.distinct()
+    if (concreteTypes.size == 1) result["type"] = JsonPrimitive(concreteTypes.single())
+    if ("null" in typeNames) result["nullable"] = JsonPrimitive(true)
+    if (properties.isNotEmpty() || concreteTypes.singleOrNull() == "object") {
+        result["properties"] = JsonObject(properties)
+    }
+
+    val required = (base["required"] as? JsonArray)
+        ?.mapNotNull { value ->
+            (value as? JsonPrimitive)?.takeIf { it.isString }?.content
+        }
+        ?.filter { it in properties }
+        ?.distinct()
+        .orEmpty()
+    if (required.isNotEmpty()) result["required"] = JsonArray(required.map(::JsonPrimitive))
+
+    val items = when (val rawItems = base["items"]) {
+        is JsonObject -> sanitizeCodeAssistSchema(rawItems)
+        is JsonArray -> mergeCodeAssistAlternatives(rawItems.toList())
+        else -> null
+    }
+    if (items != null) result["items"] = items
+
+    base["enum"]?.let { enumValue ->
+        if (enumValue is JsonArray && enumValue.all { it is JsonPrimitive }) {
+            result["enum"] = enumValue
+        }
+    }
+    base["description"]?.let { if (it is JsonPrimitive && it.isString) result["description"] = it }
+    CODE_ASSIST_SCHEMA_SCALAR_KEYS.forEach { key ->
+        base[key]?.let { value ->
+            if (value is JsonPrimitive) result[key] = value
+        }
+    }
+    return JsonObject(result)
+}
+
+private fun mergeCodeAssistAlternatives(alternatives: List<JsonElement>): JsonObject {
+    val schemas = alternatives.filterIsInstance<JsonObject>()
+    if (schemas.isEmpty()) return JsonObject(emptyMap())
+    val objectSchemas = schemas.filter {
+        val type = (it["type"] as? JsonPrimitive)?.contentOrNull
+        type == null || type == "object"
+    }
+    if (objectSchemas.size == schemas.size) {
+        val properties = linkedMapOf<String, JsonElement>()
+        objectSchemas.forEach { schema ->
+            (schema["properties"] as? JsonObject)?.forEach { (name, value) ->
+                properties.putIfAbsent(name, sanitizeCodeAssistSchema(value))
+            }
+        }
+        val requiredSets = objectSchemas.map { schema ->
+            (schema["required"] as? JsonArray)
+                ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                ?.toSet()
+                ?: emptySet()
+        }
+        val required = requiredSets.drop(1).fold(requiredSets.firstOrNull().orEmpty()) { common, branch ->
+            common intersect branch
+        }
+        return buildJsonObject {
+            put("type", "object")
+            put("properties", JsonObject(properties))
+            if (required.isNotEmpty()) put("required", JsonArray(required.map(::JsonPrimitive)))
+        }
+    }
+    return sanitizeCodeAssistSchema(schemas.first()) as JsonObject
+}
 
 class GoogleProvider(private val client: OkHttpClient, context: Context? = null) : Provider<ProviderSetting.Google> {
     private val keyRoulette = if (context != null) KeyRoulette.lru(context) else KeyRoulette.default()
@@ -377,6 +491,13 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
         messages: List<UIMessage>,
         params: TextGenerationParams,
         safetyCategories: List<String> = GOOGLE_SAFETY_CATEGORIES,
+    ): JsonObject = buildCompletionRequestBody(messages, params, safetyCategories, false)
+
+    fun buildCompletionRequestBody(
+        messages: List<UIMessage>,
+        params: TextGenerationParams,
+        safetyCategories: List<String>,
+        sanitizeToolSchemas: Boolean,
     ): JsonObject = buildJsonObject {
         // System message if available
         val systemMessage = messages.firstOrNull { it.role == MessageRole.SYSTEM }
@@ -465,18 +586,23 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
                                     put("description", JsonPrimitive(tool.description))
                                     put(
                                         key = "parameters",
-                                        element = json.encodeToJsonElement(tool.parameters())
-                                            .removeElements(
-                                                listOf(
-                                                    "const",
-                                                    "exclusiveMaximum",
-                                                    "exclusiveMinimum",
-                                                    "format",
-                                                    "additionalProperties",
-                                                    "propertyNames",
-                                                    "enum",
+                                        element = json.encodeToJsonElement(tool.parameters()).let {
+                                            if (sanitizeToolSchemas) {
+                                                sanitizeCodeAssistToolSchema(it)
+                                            } else {
+                                                it.removeElements(
+                                                    listOf(
+                                                        "const",
+                                                        "exclusiveMaximum",
+                                                        "exclusiveMinimum",
+                                                        "format",
+                                                        "additionalProperties",
+                                                        "propertyNames",
+                                                        "enum",
+                                                    )
                                                 )
-                                            )
+                                            }
+                                        }
                                     )
                                 })
                             }
