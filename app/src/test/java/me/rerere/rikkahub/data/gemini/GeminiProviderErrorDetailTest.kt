@@ -151,7 +151,7 @@ class GeminiProviderErrorDetailTest {
         """.trimIndent()
         val message = parse(body)
         assertTrue(message?.contains("rate limit") == true)
-        assertTrue(message?.contains("not by itself evidence") == true)
+        assertTrue(message?.contains("does not establish subscription quota exhaustion") == true)
         assertTrue(message?.contains("quota is exhausted") == false)
     }
 

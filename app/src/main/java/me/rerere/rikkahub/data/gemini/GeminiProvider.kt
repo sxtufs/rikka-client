@@ -433,7 +433,7 @@ internal fun parseErrorMessage(body: String?, json: Json): String? {
         val classification = classifyGeminiError(code, body, json)
         val category = when {
             code == 429 && classification.reason == "RATE_LIMIT_EXCEEDED" ->
-                " (rate limit; this is not by itself evidence that subscription quota is exhausted)"
+                " (rate limit; this does not establish subscription quota exhaustion)"
             code == 429 && classification.reason in setOf("QUOTA_EXHAUSTED", "QUOTA_FAILURE") ->
                 " (backend reported a quota or model-capacity limit)"
             code == 429 ->
