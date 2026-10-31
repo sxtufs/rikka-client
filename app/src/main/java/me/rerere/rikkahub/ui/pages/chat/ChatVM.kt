@@ -25,6 +25,7 @@ import me.rerere.ai.provider.Model
 import me.rerere.ai.ui.UIMessage
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.ai.ui.isEmptyInputMessage
+import me.rerere.rikkahub.BuildConfig
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.SettingsStore
@@ -195,6 +196,7 @@ class ChatVM(
             chatService.updateChatSearch(_conversationId, enableWebSearch, builtInSearch)
         }
     }
+
 
     /**
      * 处理消息发送

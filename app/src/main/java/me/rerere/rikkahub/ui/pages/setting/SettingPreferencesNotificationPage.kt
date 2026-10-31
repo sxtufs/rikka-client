@@ -1,6 +1,8 @@
 package me.rerere.rikkahub.ui.pages.setting
 
+import android.content.Intent
 import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,8 +18,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.rikkahub.R
@@ -48,6 +53,20 @@ fun SettingPreferencesNotificationPage(vm: SettingVM = koinViewModel()) {
         ) else emptySet(),
     )
     PermissionManager(permissionState = permissionState)
+
+    val context = LocalContext.current
+    var canDrawOverlays by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
+    // 从系统设置页授权回来后刷新
+    LifecycleResumeEffect(Unit) {
+        canDrawOverlays = Settings.canDrawOverlays(context)
+        onPauseOrDispose {}
+    }
+
+    fun requestOverlayPermission() {
+        context.startActivity(
+            Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:${context.packageName}".toUri())
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -91,6 +110,27 @@ fun SettingPreferencesNotificationPage(vm: SettingVM = koinViewModel()) {
                             },
                             supportingContent = { Text(stringResource(R.string.setting_display_page_live_update_notification_desc)) },
                             headlineContent = { Text(stringResource(R.string.setting_display_page_live_update_notification)) },
+                        )
+                    }
+                    switchItem(
+                        checked = displaySetting.enableFloatingChatWindow,
+                        onCheckedChange = {
+                            if (it && !canDrawOverlays) requestOverlayPermission()
+                            updateDisplaySetting(displaySetting.copy(enableFloatingChatWindow = it))
+                        },
+                        supportingContent = {
+                            Text(stringResource(R.string.setting_page_preferences_notification_floating_window_desc))
+                        },
+                        headlineContent = { Text(stringResource(R.string.setting_page_preferences_notification_floating_window)) },
+                    )
+                    if (displaySetting.enableFloatingChatWindow && !canDrawOverlays) {
+                        item(
+                            onClick = ::requestOverlayPermission,
+                            headlineContent = { Text(stringResource(R.string.setting_page_preferences_notification_overlay_permission)) },
+                            supportingContent = { Text(stringResource(R.string.setting_page_preferences_notification_overlay_permission_desc)) },
+                            trailingContent = {
+                                Icon(HugeIcons.ArrowRight01, contentDescription = null)
+                            },
                         )
                     }
                 }

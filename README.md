@@ -27,4 +27,4 @@ A `google-services.json` file may be required in the `app` directory to build th
 
 ## License
 
-This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+This project is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).

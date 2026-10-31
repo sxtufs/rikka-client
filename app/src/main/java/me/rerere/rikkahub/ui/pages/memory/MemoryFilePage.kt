@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -56,6 +55,7 @@ import me.rerere.rikkahub.data.model.memoryTitleOf
 import me.rerere.rikkahub.data.repository.MemoryWriteResult
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.components.richtext.MarkdownBlock
+import me.rerere.rikkahub.ui.components.richtext.SelectableContent
 import me.rerere.rikkahub.ui.components.ui.CardGroup
 import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.context.LocalToaster
@@ -116,7 +116,10 @@ fun MemoryFilePage(memoryId: String, path: String?) {
     val unchangedContent = remember(file) {
         file?.run { contentWith(title, description, aliases, editableBody) }
     }
-    val draftContentValid = draftContent.toByteArray().size <= MemoryFile.MAX_BYTES
+    // 和仓库层一样只拦变大的超限：迁移来的旧记忆可能本来就超限，得允许分几次删小
+    val currentSize = remember(file) { file?.content?.toByteArray()?.size ?: 0 }
+    val draftSize = draftContent.toByteArray().size
+    val draftContentValid = draftSize <= MemoryFile.MAX_BYTES || draftSize <= currentSize
     val canSave = draftContentValid && if (isNew) draftPathValid else draftContent != unchangedContent
 
     fun onSaved(result: MemoryWriteResult) {
@@ -306,7 +309,7 @@ private fun MemoryFileDetail(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        SelectionContainer {
+                        SelectableContent {
                             MarkdownBlock(
                                 content = file.displayBody,
                                 modifier = Modifier.fillMaxWidth(),
