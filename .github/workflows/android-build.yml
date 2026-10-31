@@ -21,22 +21,18 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Set up JDK 17
+      # 與 Android Studio 自帶的 JetBrains Runtime 21 保持一致，編譯速度顯著提升
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: '17'
-          cache: gradle
+          distribution: 'jetbrains'
+          java-version: '21'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
-
-      - name: Install Android SDK packages
-        run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platform-tools" "platforms;android-37.2" "build-tools;37.0.0"
+      # 官方 Gradle 構建緩存，自動緩存依賴與任務輸出
+      - name: Setup Gradle Cache
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
