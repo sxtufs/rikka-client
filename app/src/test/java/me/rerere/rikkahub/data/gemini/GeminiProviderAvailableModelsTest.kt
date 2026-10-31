@@ -128,4 +128,26 @@ class GeminiProviderAvailableModelsTest {
         val model = mapModels(body).single()
         assertEquals(listOf(ModelAbility.TOOL, ModelAbility.REASONING), model.abilities)
     }
+
+    @Test
+    fun `tab prefix completion models are filtered out`() {
+        val body = """
+            {
+              "models": {
+                "tab_flash_lite_preview": {"displayName": "Tab Flash Lite Preview"},
+                "tab_jump_flash_lite_preview": {"displayName": "Tab Jump Flash Lite Preview"},
+                "gemini-3.8-flash-high": {"displayName": "Gemini 3.8 Flash"}
+              }
+            }
+        """.trimIndent()
+        val models = mapModels(body)
+        assertEquals(listOf("gemini-3.8-flash-high"), models.map { it.modelId })
+    }
+
+    @Test
+    fun `Claude 5-5 models with supportsThinking true do not get REASONING`() {
+        val body = """{"models": {"claude-opus-5-5-high": {"displayName": "Claude Opus 5.5 High", "supportsThinking": true}}}"""
+        val model = mapModels(body).single()
+        assertEquals(listOf(ModelAbility.TOOL), model.abilities)
+    }
 }

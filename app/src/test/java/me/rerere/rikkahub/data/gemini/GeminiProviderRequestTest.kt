@@ -236,4 +236,11 @@ class GeminiProviderRequestTest {
         val stripped = invokeStripThinkingConfigForGptOss("gemini-claude-opus-4-6-thinking", request)
         assertEquals(8000, budgetOf(stripped))
     }
+
+    @Test
+    fun `a Claude 5-5 request has no thinkingConfig after post-processing`() {
+        val stripped = invokeStripThinkingConfigForGptOss("claude-opus-5-5-high", requestWithBudget(8000))
+        val finalRequest = invokeRaiseMaxTokens(invokeRaiseThinkingBudget(stripped))
+        assertNull(finalRequest["generationConfig"]?.jsonObject?.get("thinkingConfig"))
+    }
 }

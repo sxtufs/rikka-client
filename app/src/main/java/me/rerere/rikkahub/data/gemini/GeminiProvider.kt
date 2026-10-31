@@ -467,6 +467,7 @@ private fun mapAvailableModels(body: String, json: Json): List<Model> {
         val item = element as? JsonObject ?: return@mapNotNull null
         if (item["isInternal"]?.jsonPrimitive?.booleanOrNull == true) return@mapNotNull null
         if (modelId in DENIED_MODEL_IDS) return@mapNotNull null
+        if (modelId.startsWith("tab_", ignoreCase = true)) return@mapNotNull null
         val supportsImages = item["supportsImages"]?.jsonPrimitive?.booleanOrNull == true
         Model(
             modelId = modelId,
@@ -479,7 +480,8 @@ private fun mapAvailableModels(body: String, json: Json): List<Model> {
             abilities = buildList {
                 add(ModelAbility.TOOL)
                 if (item["supportsThinking"]?.jsonPrimitive?.booleanOrNull == true &&
-                    !isGptOssModelId(modelId)
+                    !isGptOssModelId(modelId) &&
+                    !isClaude55ModelId(modelId)
                 ) {
                     add(ModelAbility.REASONING)
                 }
@@ -615,13 +617,17 @@ private fun resolveStreamFailureCause(
 internal fun isGptOssModelId(modelId: String): Boolean =
     modelId.contains("gpt-oss", ignoreCase = true)
 
+internal fun isClaude55ModelId(modelId: String): Boolean =
+    modelId.contains("claude", ignoreCase = true) && modelId.contains("5-5", ignoreCase = true)
+
 /**
- * Strips `generationConfig.thinkingConfig` for GPT-OSS models (see [isGptOssModelId]) before
- * [raiseThinkingBudgetToClaudeFloor] and [raiseMaxTokensAboveThinkingBudget] run, so those
- * Claude-only raisers see no thinking config and are no-ops here.
+ * Strips `generationConfig.thinkingConfig` for GPT-OSS models (see [isGptOssModelId]) and Claude 5.5
+ * models (see [isClaude55ModelId]) before [raiseThinkingBudgetToClaudeFloor] and
+ * [raiseMaxTokensAboveThinkingBudget] run, so those Claude-only raisers see no thinking config and are
+ * no-ops here.
  */
 private fun stripThinkingConfigForGptOss(modelId: String, request: JsonObject): JsonObject {
-    if (!isGptOssModelId(modelId)) return request
+    if (!isGptOssModelId(modelId) && !isClaude55ModelId(modelId)) return request
     val config = request["generationConfig"] as? JsonObject ?: return request
     if ("thinkingConfig" !in config) return request
     return JsonObject(request + ("generationConfig" to JsonObject(config - "thinkingConfig")))
